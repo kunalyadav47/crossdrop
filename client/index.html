@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CrossDrop - AirDrop for everyone</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#121212">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+</head>
+<body>
+    <div id="app">
+        <div id="wifi-tip" class="hidden banner">
+            💡 Switch your hotspot to 5GHz in settings for 2x faster transfers
+            <button id="close-tip">&times;</button>
+        </div>
+
+        <header>
+            <div class="logo-container">
+                <div class="logo-icon"></div>
+                <h1>CrossDrop</h1>
+            </div>
+            <p class="tagline">AirDrop for everyone</p>
+            <div id="network-status" class="status connected">
+                <span class="dot"></span> <span id="status-text">Ready</span>
+            </div>
+        </header>
+
+        <main id="view-home" class="view active">
+            <div class="action-buttons">
+                <button id="btn-send" class="primary-btn">
+                    <span class="icon">📤</span>
+                    <span class="text">Send Files</span>
+                </button>
+                <button id="btn-receive" class="secondary-btn">
+                    <span class="icon">📥</span>
+                    <span class="text">Receive Files</span>
+                </button>
+            </div>
+            <div class="device-info">
+                You are known as: <strong id="my-device-name">...</strong>
+            </div>
+        </main>
+
+        <main id="view-send" class="view hidden">
+            <button class="back-btn">← Back</button>
+            <h2>Send Files</h2>
+            <div id="send-setup" class="setup-container">
+                <div id="qr-container">
+                    <canvas id="qr-canvas"></canvas>
+                </div>
+                <div class="room-code-display">
+                    Code: <strong id="room-code">------</strong>
+                </div>
+                <p>Scan this QR code on the receiving device or enter the code manually.</p>
+                <div class="waiting-text">Waiting for receiver...</div>
+            </div>
+
+            <div id="send-active" class="active-container hidden">
+                <div class="connected-info">
+                    ✅ Connected to <strong id="receiver-name">...</strong>
+                </div>
+                <div id="drop-zone" class="drop-zone">
+                    <input type="file" id="file-input" multiple hidden>
+                    <div class="drop-content">
+                        <span class="drop-icon">📁</span>
+                        <p>Drag & Drop files here</p>
+                        <p class="small">or tap to select</p>
+                    </div>
+                </div>
+                <div id="send-queue" class="file-list"></div>
+                <div class="speed-indicator hidden" id="send-speed-indicator">
+                    Speed: <span id="send-speed">0</span> MB/s
+                </div>
+            </div>
+        </main>
+
+        <main id="view-receive" class="view hidden">
+            <button class="back-btn">← Back</button>
+            <h2>Receive Files</h2>
+            <div id="receive-setup" class="setup-container">
+                <div class="scanner-container">
+                    <video id="scanner-video" playsinline></video>
+                    <div class="scanner-overlay"></div>
+                </div>
+                <p>Scan the QR code from the sender device.</p>
+                <div class="manual-entry">
+                    <span>Or enter code:</span>
+                    <input type="text" id="manual-code" maxlength="6" placeholder="123456">
+                    <button id="join-btn">Join</button>
+                </div>
+                <div class="waiting-text hidden" id="receive-waiting">Connecting...</div>
+            </div>
+
+            <div id="receive-active" class="active-container hidden">
+                <div class="connected-info">
+                    ✅ Connected to <strong id="sender-name">...</strong>
+                </div>
+                <div id="receive-queue" class="file-list"></div>
+                <div class="speed-indicator hidden" id="receive-speed-indicator">
+                    Speed: <span id="receive-speed">0</span> MB/s
+                </div>
+            </div>
+        </main>
+
+        <div id="incoming-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Incoming File</h3>
+                <div class="file-info">
+                    <span class="file-icon">📄</span>
+                    <span id="incoming-filename" class="filename">document.pdf</span>
+                    <span id="incoming-filesize" class="filesize">2.5 MB</span>
+                </div>
+                <div class="modal-actions">
+                    <button id="btn-decline" class="danger-btn">Decline</button>
+                    <button id="btn-accept" class="success-btn">Accept</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CDNs for dependencies -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    
+    <!-- App Logic -->
+    <script src="/js/detect.js"></script>
+    <script src="/js/qr.js"></script>
+    <script src="/js/transfer.js"></script>
+    <script src="/js/webrtc.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
