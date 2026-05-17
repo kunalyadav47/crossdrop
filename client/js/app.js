@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://localhost:3000';
+const BACKEND_URL = 'https://crossdrop-yjib.onrender.com';
 
 window.myName = generateDeviceName();
 
