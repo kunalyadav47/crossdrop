@@ -13,10 +13,10 @@ const WebRTC = {
     connected: false,
     _peerName: '',
 
-    localOnly: true,
-    allowInternetRoute: false,
+    networkMode: 'strict', // 'strict', 'wifi', 'any'
     sctpMaxMessageSize: 256 * 1024,
     safetyAbortTimer: null,
+    telemetryInterval: null,
     connectionType: 'unknown',
 
     isPrivateIp(ip) {
@@ -31,9 +31,19 @@ const WebRTC = {
         return false;
     },
 
-    extractIpFromCandidate(candStr) {
+    parseCandidate(candStr) {
         const parts = candStr.split(' ');
-        return parts[4] || null;
+        const ip = parts[4] || '';
+        const typeIndex = parts.indexOf('typ');
+        const type = typeIndex !== -1 ? parts[typeIndex + 1] : 'unknown';
+        
+        const costMatch = candStr.match(/network-cost (\d+)/);
+        const cost = costMatch ? parseInt(costMatch[1], 10) : null;
+        
+        const idMatch = candStr.match(/network-id (\d+)/);
+        const id = idMatch ? parseInt(idMatch[1], 10) : null;
+
+        return { ip, type, cost, id };
     },
 
     startReceiver() {
@@ -77,12 +87,13 @@ const WebRTC = {
             iceCandidatePoolSize: 8
         });
 
-        if (this.localOnly && !this.allowInternetRoute) {
+        // Fail fast timer
+        if (this.networkMode === 'strict') {
             clearTimeout(this.safetyAbortTimer);
             this.safetyAbortTimer = setTimeout(() => {
                 if (!this.connected) {
                     const wait = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
-                    if (wait) wait.textContent = "❌ No LAN path found. Ensure both devices are on the SAME WiFi (not a hotspot with AP isolation), or enable 'Allow Internet Route' in Advanced settings.";
+                    if (wait) wait.textContent = "❌ No LAN path found. Ensure both devices are on the SAME WiFi (not a hotspot with AP isolation), or loosen Network Rules in Advanced settings.";
                     if (this.peer) { this.peer.close(); this.peer = null; }
                 }
             }, 15000);
@@ -91,15 +102,25 @@ const WebRTC = {
         this.peer.onicecandidate = (e) => {
             if (e.candidate) {
                 const candStr = e.candidate.candidate || '';
-                const isHost = candStr.includes('typ host');
-                const ip = this.extractIpFromCandidate(candStr);
+                const candInfo = this.parseCandidate(candStr);
 
-                if (this.localOnly && !this.allowInternetRoute) {
-                    if (!isHost || !this.isPrivateIp(ip)) {
-                        console.log('[LAN-only 🛡️] blocked local non-private candidate:', candStr);
+                if (this.networkMode === 'strict') {
+                    if (candInfo.type !== 'host' || !this.isPrivateIp(candInfo.ip)) {
+                        console.log('[LAN-Only] dropped non-private candidate:', candStr);
+                        return;
+                    }
+                    if (candInfo.cost !== null && candInfo.cost >= 900) {
+                        console.log('[LAN-Only] dropped cellular candidate (cost > 900):', candStr);
+                        return;
+                    }
+                } else if (this.networkMode === 'wifi') {
+                    if (candInfo.type === 'relay') return; // NEVER use turn
+                    if (candInfo.cost !== null && candInfo.cost >= 900) {
+                        console.log('[WiFi-Only] dropped cellular candidate (cost > 900):', candStr);
                         return;
                     }
                 }
+
                 socket.emit('ice-candidate', this.roomId, e.candidate);
             }
         };
@@ -115,9 +136,9 @@ const WebRTC = {
                     this.verifyAndFinalize();
                 }
                 if (state === 'failed') {
-                    el.textContent = (this.localOnly && !this.allowInternetRoute)
-                        ? "❌ Local-Only mode: no LAN route found. Disable Local-Only or use a real WiFi router (not hotspot AP-isolation)."
-                        : "❌ Connection failed. Make sure both devices are on the SAME WiFi.";
+                    el.textContent = (this.networkMode === 'strict')
+                        ? "❌ Strict mode: no LAN route found. Try switching to 'WiFi Network OK' if using a router."
+                        : "❌ Connection failed. Ensure devices can reach each other.";
                 }
                 if (state === 'disconnected') el.textContent = "⚠️ Peer disconnected.";
             }
@@ -168,6 +189,7 @@ const WebRTC = {
         try {
             const stats = await this.peer.getStats();
             let localType = '', remoteType = '', localIp = '', remoteIp = '';
+            let networkType = 'unknown';
 
             stats.forEach(report => {
                 if (report.type === 'candidate-pair' && report.state === 'succeeded') {
@@ -178,16 +200,27 @@ const WebRTC = {
                         remoteType = remoteCand.candidateType;
                         localIp = localCand.ip || localCand.address;
                         remoteIp = remoteCand.ip || remoteCand.address;
+                        networkType = localCand.networkType || 'unknown';
                     }
                 }
             });
 
             const isPureLan = localType === 'host' && remoteType === 'host' && this.isPrivateIp(localIp) && this.isPrivateIp(remoteIp);
 
-            if (this.localOnly && !this.allowInternetRoute && !isPureLan) {
-                console.error("LAN-only mode violated. Connection rejected.");
+            if (this.networkMode === 'strict' && !isPureLan) {
+                console.error("Strict mode violated. Connection rejected.");
                 const wait = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
-                if (wait) wait.textContent = "❌ Route verification failed. Internet path detected while in LAN-only mode.";
+                if (wait) wait.textContent = "❌ Route verification failed. Internet path detected while in Strict mode.";
+                this.peer.close();
+                this.peer = null;
+                this.dataChannels = [];
+                return;
+            }
+
+            if (this.networkMode === 'wifi' && networkType === 'cellular') {
+                console.error("WiFi mode violated. Cellular path detected.");
+                const wait = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
+                if (wait) wait.textContent = "❌ Cellular path detected! Connection aborted to save data.";
                 this.peer.close();
                 this.peer = null;
                 this.dataChannels = [];
@@ -201,16 +234,72 @@ const WebRTC = {
             this.connected = true;
             this.onConnected(this._peerName);
 
+            this.startTelemetrySentinel();
+
         } catch (e) {
             console.error("Verification failed", e);
-            if (this.localOnly && !this.allowInternetRoute) {
+            if (this.networkMode === 'strict') {
                 if (this.peer) this.peer.close();
                 return;
             }
             this.connectionType = 'unknown';
             this.connected = true;
             this.onConnected(this._peerName);
+            this.startTelemetrySentinel();
         }
+    },
+
+    startTelemetrySentinel() {
+        if (this.telemetryInterval) clearInterval(this.telemetryInterval);
+        this.telemetryInterval = setInterval(async () => {
+            if (!this.peer || !this.connected) return;
+            try {
+                const stats = await this.peer.getStats();
+                let bytesSent = 0, bytesReceived = 0, rtt = 0;
+                let localType = '', remoteType = '', localIp = '', remoteIp = '';
+                let networkType = 'unknown';
+
+                stats.forEach(report => {
+                    if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                        bytesSent = report.bytesSent || 0;
+                        bytesReceived = report.bytesReceived || 0;
+                        rtt = report.currentRoundTripTime || 0;
+                        const localCand = stats.get(report.localCandidateId);
+                        const remoteCand = stats.get(report.remoteCandidateId);
+                        if (localCand) {
+                            localType = localCand.candidateType;
+                            localIp = localCand.ip || localCand.address;
+                            networkType = localCand.networkType || 'unknown';
+                        }
+                        if (remoteCand) {
+                            remoteType = remoteCand.candidateType;
+                            remoteIp = remoteCand.ip || remoteCand.address;
+                        }
+                    }
+                });
+
+                // Defensive cellular detection
+                if (this.networkMode !== 'any') {
+                    if (networkType === 'cellular') {
+                        console.error("Sentinel detected cellular route mid-transfer!");
+                        this.disconnect();
+                        alert("🛑 Transfer aborted — cellular route detected mid-transfer. Your data is safe.");
+                        return;
+                    }
+                }
+
+                const pre = document.getElementById('telemetry-log');
+                if (pre) {
+                    pre.innerHTML = `🛡️ Network Mode:   ${this.networkMode.toUpperCase()}
+├─ Local interface:  ${localType} (${localIp}) [${networkType}]
+├─ Remote interface: ${remoteType} (${remoteIp})
+├─ Route Type:       ${this.connectionType}
+├─ Sent Data:        ${(bytesSent / 1024 / 1024).toFixed(2)} MB
+├─ Received Data:    ${(bytesReceived / 1024 / 1024).toFixed(2)} MB
+└─ RTT Latency:      ${(rtt * 1000).toFixed(1)} ms`;
+                }
+            } catch(e) {}
+        }, 1000);
     },
 
     async makeOffer() {
@@ -262,6 +351,7 @@ const WebRTC = {
     },
 
     disconnect() {
+        if (this.telemetryInterval) clearInterval(this.telemetryInterval);
         if (this.peer) { this.peer.close(); this.peer = null; }
         this.dataChannels = [];
         this.connected = false;
@@ -332,14 +422,18 @@ socket.on('answer', async (id, answer) => {
 socket.on('ice-candidate', async (id, candidate) => {
     if (WebRTC.peer) {
         try {
-            if (WebRTC.localOnly && !WebRTC.allowInternetRoute) {
-                const candStr = candidate.candidate || '';
-                const isHost = candStr.includes('typ host');
-                const ip = WebRTC.extractIpFromCandidate(candStr);
-                if (!isHost || !WebRTC.isPrivateIp(ip)) {
-                    console.log('[LAN-only 🛡️] dropping incoming non-host candidate');
+            const candStr = candidate.candidate || '';
+            const candInfo = WebRTC.parseCandidate(candStr);
+
+            if (WebRTC.networkMode === 'strict') {
+                if (candInfo.type !== 'host' || !WebRTC.isPrivateIp(candInfo.ip)) {
+                    console.log('[LAN-only] dropping incoming non-private candidate');
                     return;
                 }
+                if (candInfo.cost !== null && candInfo.cost >= 900) return;
+            } else if (WebRTC.networkMode === 'wifi') {
+                if (candInfo.type === 'relay') return;
+                if (candInfo.cost !== null && candInfo.cost >= 900) return;
             }
             await WebRTC.peer.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (e) {

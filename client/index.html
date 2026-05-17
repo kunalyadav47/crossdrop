@@ -27,27 +27,41 @@
             </div>
         </header>
 
-        <!-- HOME VIEW -->
         <main id="view-home" class="view active">
-            <div class="data-guarantee">
+            <div class="data-guarantee" id="data-guarantee-banner">
                 <div class="data-guarantee-icon">🛡️</div>
                 <div class="data-guarantee-text">
                     <strong>$0 Mobile Data Guarantee</strong>
-                    <small>Transfers run on your LAN only — physically cannot use cellular data.</small>
+                    <small>Strict LAN mode active. Cannot use cellular data.</small>
                 </div>
             </div>
 
             <details class="advanced-settings">
-                <summary>Advanced</summary>
+                <summary>Advanced Network Rules</summary>
                 <div class="advanced-settings-content">
-                    <label class="lan-toggle" for="allow-internet-toggle">
-                        <input type="checkbox" id="allow-internet-toggle">
-                        <span class="lan-toggle-track"><span class="lan-toggle-thumb"></span></span>
-                        <span class="lan-toggle-text">
-                            🌐 Allow Internet Route
-                            <small>Off = LAN only ($0 data). On = also works across networks (uses data).</small>
-                        </span>
-                    </label>
+                    <div class="network-mode-selector">
+                        <label class="net-radio">
+                            <input type="radio" name="net_mode" value="strict" checked>
+                            <div class="net-radio-content">
+                                <b>🛡️ Strict LAN Only</b>
+                                <span>Refuses any internet route. Direct P2P only.</span>
+                            </div>
+                        </label>
+                        <label class="net-radio">
+                            <input type="radio" name="net_mode" value="wifi">
+                            <div class="net-radio-content">
+                                <b>🌐 WiFi Network OK</b>
+                                <span>Allows WiFi router internet, refuses cellular.</span>
+                            </div>
+                        </label>
+                        <label class="net-radio">
+                            <input type="radio" name="net_mode" value="any">
+                            <div class="net-radio-content">
+                                <b>📶 Any Network OK</b>
+                                <span>Allows cellular and internet paths (Uses Data).</span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
             </details>
 
@@ -110,6 +124,11 @@
                 </div>
                 <button id="btn-disconnect" class="disconnect-btn" title="Disconnect">✕</button>
             </div>
+            
+            <details class="telemetry-panel" id="telemetry-panel">
+                <summary>📊 Connection Diagnostics</summary>
+                <pre id="telemetry-log">Loading stats...</pre>
+            </details>
 
             <!-- Speed indicator -->
             <div class="speed-bar-wrap hidden" id="speed-bar-wrap">

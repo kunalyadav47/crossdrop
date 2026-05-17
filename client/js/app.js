@@ -73,39 +73,47 @@ window.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('crossdrop_tip_shown', 'true');
     });
 
-    // ── Advanced: Allow Internet Route Toggle ──
-    const internetToggle = document.getElementById('allow-internet-toggle');
-    if (internetToggle) {
-        const saved = localStorage.getItem('crossdrop_allow_internet') === 'true';
-        internetToggle.checked = saved;
-        WebRTC.allowInternetRoute = saved;
-        WebRTC.localOnly = true; // Hardcode default localOnly safety
+    // ── Advanced: Network Mode Radio Buttons ──
+    const radios = document.querySelectorAll('input[name="net_mode"]');
+    const guarantee = document.getElementById('data-guarantee-banner');
+    
+    function updateNetworkModeUI(mode) {
+        if (!guarantee) return;
+        const small = guarantee.querySelector('small');
         
-        internetToggle.addEventListener('change', () => {
-            WebRTC.allowInternetRoute = internetToggle.checked;
-            localStorage.setItem('crossdrop_allow_internet', internetToggle.checked);
+        guarantee.className = 'data-guarantee'; // reset classes
+        if (mode === 'strict') {
+            small.textContent = 'Strict LAN mode active. Cannot use cellular data.';
+        } else if (mode === 'wifi') {
+            guarantee.classList.add('data-guarantee-off');
+            small.textContent = 'WiFi routing allowed. Will refuse cellular paths.';
+        } else if (mode === 'any') {
+            guarantee.classList.add('data-guarantee-off');
+            // Make it red for ANY
+            guarantee.style.borderColor = 'rgba(239,68,68,0.5)';
+            guarantee.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))';
+            small.textContent = '⚠️ WARNING: Any network route allowed (May use Mobile Data).';
+        }
+    }
+
+    if (radios.length > 0) {
+        const savedMode = localStorage.getItem('crossdrop_net_mode') || 'strict';
+        WebRTC.networkMode = savedMode;
+        
+        radios.forEach(radio => {
+            if (radio.value === savedMode) radio.checked = true;
             
-            const guarantee = document.querySelector('.data-guarantee');
-            if (guarantee) {
-                guarantee.classList.toggle('data-guarantee-off', internetToggle.checked);
-                const small = guarantee.querySelector('small');
-                if (small) {
-                    small.textContent = internetToggle.checked
-                        ? '⚠️ Internet route enabled — transfers may use mobile data.'
-                        : 'Transfers run on your LAN only — physically cannot use cellular data.';
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    WebRTC.networkMode = e.target.value;
+                    localStorage.setItem('crossdrop_net_mode', e.target.value);
+                    if (guarantee) guarantee.style = ''; // clear inline styles
+                    updateNetworkModeUI(e.target.value);
                 }
-            }
+            });
         });
         
-        // Trigger UI update immediately for loaded state
-        if (saved) {
-            const guarantee = document.querySelector('.data-guarantee');
-            if (guarantee) {
-                guarantee.classList.add('data-guarantee-off');
-                const small = guarantee.querySelector('small');
-                if (small) small.textContent = '⚠️ Internet route enabled — transfers may use mobile data.';
-            }
-        }
+        updateNetworkModeUI(savedMode);
     }
 
     // ── Service Worker with forced update ──
