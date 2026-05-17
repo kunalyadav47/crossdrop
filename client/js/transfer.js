@@ -85,15 +85,21 @@ window.FileTransfer = {
         container.appendChild(div);
     },
 
-    updateSpeedIndicator(elementId, speedId, mbps) {
-        const element = document.getElementById(elementId);
-        const speedElem = document.getElementById(speedId);
-        element.classList.remove('hidden');
-        speedElem.textContent = mbps.toFixed(1);
-        element.classList.remove('good', 'ok', 'poor');
-        if (mbps > 30) element.classList.add('good');
-        else if (mbps >= 10) element.classList.add('ok');
-        else element.classList.add('poor');
+    updateSpeedUI(mbps) {
+        const wrap = document.getElementById('speed-bar-wrap');
+        const fill = document.getElementById('speed-bar-fill');
+        const label = document.getElementById('transfer-speed-label');
+        if (!wrap) return;
+        wrap.classList.remove('hidden');
+        label.textContent = `⚡ ${mbps.toFixed(1)} MB/s`;
+        // Cap bar at 100MB/s visually
+        const pct = Math.min((mbps / 100) * 100, 100);
+        fill.style.width = pct + '%';
+    },
+
+    hideSpeedUI() {
+        const wrap = document.getElementById('speed-bar-wrap');
+        if (wrap) wrap.classList.add('hidden');
     },
 
     async processQueue() {
@@ -148,7 +154,7 @@ window.FileTransfer = {
                     const el = performance.now() - this.startTime;
                     if (el > 0) {
                         const mbps = (this.bytesSent / (1024*1024)) / (el / 1000);
-                        this.updateSpeedIndicator('send-speed-indicator', 'send-speed', mbps);
+                        this.updateSpeedUI(mbps);
                     }
                 }, 500);
 
@@ -164,7 +170,7 @@ window.FileTransfer = {
                             this.sendControl({ type: 'done', id: item.id });
                             document.getElementById(`prog-${item.id}`).style.width = '100%';
                             document.getElementById(`prog-${item.id}`).style.background = 'var(--success-color)';
-                            document.getElementById('send-speed-indicator').classList.add('hidden');
+                            this.hideSpeedUI();
                             resolve();
                         }
                         return;
@@ -255,7 +261,7 @@ window.FileTransfer = {
             if (now - (this.lastSpeedUpdate || 0) > 500) {
                 const el = (now - this.startTime) / 1000;
                 const mbps = (this.bytesReceived / (1024*1024)) / el;
-                this.updateSpeedIndicator('receive-speed-indicator', 'receive-speed', mbps);
+                this.updateSpeedUI(mbps);
                 this.lastSpeedUpdate = now;
             }
 
@@ -275,8 +281,11 @@ window.FileTransfer = {
     },
 
     async finishReceive() {
-        document.getElementById('receive-speed-indicator').classList.add('hidden');
+        this.hideSpeedUI();
         document.getElementById(`prog-${this.incomingMeta.id}`).style.background = 'var(--success-color)';
+        // Hide the idle card since we now have a file
+        const idle = document.getElementById('receiver-idle-card');
+        if (idle) idle.style.display = 'none';
         
         let blob = new Blob(this.receiveBuffer);
         this.receiveBuffer = []; // free memory

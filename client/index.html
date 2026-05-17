@@ -22,11 +22,12 @@
                 <h1>CrossDrop</h1>
             </div>
             <p class="tagline">AirDrop for everyone</p>
-            <div id="network-status" class="status connected">
-                <span class="dot"></span> <span id="status-text">Ready</span>
+            <div id="network-status" class="status">
+                <span class="dot"></span> <span id="status-text">Connecting...</span>
             </div>
         </header>
 
+        <!-- HOME VIEW -->
         <main id="view-home" class="view active">
             <div class="action-buttons">
                 <button id="btn-send" class="primary-btn">
@@ -43,43 +44,26 @@
             </div>
         </main>
 
-        <main id="view-send" class="view">
+        <!-- SEND VIEW — Sender scans QR or types code from Receiver -->
+        <main id="view-send" class="view" style="display:none;">
             <button class="back-btn">← Back</button>
             <h2>Send Files</h2>
             <div id="send-setup" class="setup-container">
                 <div class="scanner-container">
-                    <video id="scanner-video" playsinline></video>
+                    <video id="scanner-video" playsinline muted></video>
                     <div class="scanner-overlay"></div>
                 </div>
-                <p>Scan the QR code from the receiver device.</p>
+                <p style="color:var(--text-muted);font-size:14px;">Scan the QR code shown on the receiver's screen.</p>
                 <div class="manual-entry">
-                    <span>Or enter code:</span>
-                    <input type="text" id="manual-code" maxlength="6" placeholder="123456">
+                    <input type="text" id="manual-code" maxlength="6" placeholder="Or type code here" autocomplete="off" autocorrect="off" spellcheck="false">
                     <button id="join-btn">Connect</button>
                 </div>
-                <div class="waiting-text hidden" id="send-waiting">Connecting...</div>
-            </div>
-
-            <div id="send-active" class="active-container hidden">
-                <div class="connected-info">
-                    ✅ Connected to <strong id="receiver-name">...</strong>
-                </div>
-                <div id="drop-zone" class="drop-zone">
-                    <input type="file" id="file-input" multiple hidden>
-                    <div class="drop-content">
-                        <span class="drop-icon">📁</span>
-                        <p>Drag & Drop files here</p>
-                        <p class="small">or tap to select</p>
-                    </div>
-                </div>
-                <div id="send-queue" class="file-list"></div>
-                <div class="speed-indicator hidden" id="send-speed-indicator">
-                    Speed: <span id="send-speed">0</span> MB/s
-                </div>
+                <div class="waiting-text hidden" id="send-waiting"></div>
             </div>
         </main>
 
-        <main id="view-receive" class="view">
+        <!-- RECEIVE VIEW — Receiver shows QR and code, waits -->
+        <main id="view-receive" class="view" style="display:none;">
             <button class="back-btn">← Back</button>
             <h2>Receive Files</h2>
             <div id="receive-setup" class="setup-container">
@@ -87,26 +71,60 @@
                 <div class="room-code-display">
                     Code: <strong id="room-code">------</strong>
                 </div>
-                <p>Share this code or let the sender scan the QR.</p>
+                <p style="color:var(--text-muted);font-size:14px;">Share this code or let the sender scan the QR above.</p>
                 <div class="waiting-text">Waiting for sender...</div>
-            </div>
-
-            <div id="receive-active" class="active-container hidden">
-                <div class="connected-info">
-                    ✅ Connected to <strong id="sender-name">...</strong>
-                </div>
-                <div id="receive-queue" class="file-list"></div>
-                <div class="speed-indicator hidden" id="receive-speed-indicator">
-                    Speed: <span id="receive-speed">0</span> MB/s
-                </div>
+                <div class="waiting-text hidden" id="receive-waiting"></div>
             </div>
         </main>
 
+        <!-- CONNECTED DASHBOARD — shown to BOTH sender and receiver after pairing -->
+        <main id="view-connected" class="view" style="display:none;">
+            <!-- Connection success banner -->
+            <div class="connected-banner">
+                <div class="connected-checkmark">✓</div>
+                <div>
+                    <div class="connected-title">Connected!</div>
+                    <div class="connected-peer">with <span id="peer-name">...</span></div>
+                </div>
+                <button id="btn-disconnect" class="disconnect-btn" title="Disconnect">✕</button>
+            </div>
+
+            <!-- Speed indicator -->
+            <div class="speed-bar-wrap hidden" id="speed-bar-wrap">
+                <span id="transfer-speed-label">⚡ 0 MB/s</span>
+                <div class="speed-bar-bg"><div class="speed-bar-fill" id="speed-bar-fill"></div></div>
+            </div>
+
+            <!-- SENDER: File drop zone (only shown when isSender) -->
+            <div id="sender-panel" class="panel hidden">
+                <div id="drop-zone" class="drop-zone">
+                    <input type="file" id="file-input" multiple hidden>
+                    <div class="drop-content">
+                        <div class="drop-icon">📁</div>
+                        <p class="drop-title">Tap to select files</p>
+                        <p class="drop-sub">or drag & drop here</p>
+                    </div>
+                </div>
+                <div id="send-queue" class="file-list"></div>
+            </div>
+
+            <!-- RECEIVER: Waiting and received files list -->
+            <div id="receiver-panel" class="panel hidden">
+                <div class="receiver-waiting-card" id="receiver-idle-card">
+                    <div style="font-size:48px;margin-bottom:12px;">📥</div>
+                    <p class="drop-title">Waiting for files...</p>
+                    <p class="drop-sub">The sender will choose files to send you.</p>
+                </div>
+                <div id="receive-queue" class="file-list"></div>
+            </div>
+        </main>
+
+        <!-- Incoming file modal (shown to receiver when sender sends a file) -->
         <div id="incoming-modal" class="modal hidden">
             <div class="modal-content">
                 <h3>Incoming File</h3>
                 <div class="file-info">
-                    <span class="file-icon">📄</span>
+                    <span class="file-icon" id="incoming-fileicon">📄</span>
                     <span id="incoming-filename" class="filename">document.pdf</span>
                     <span id="incoming-filesize" class="filesize">2.5 MB</span>
                 </div>
@@ -118,14 +136,14 @@
         </div>
     </div>
 
-    <!-- CDNs for dependencies -->
+    <!-- CDNs -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    
-    <!-- Config loads first so BACKEND_URL is available to all scripts -->
+
+    <!-- Config loads first -->
     <script src="/js/config.js"></script>
-    <!-- App Logic -->
+    <!-- App logic -->
     <script src="/js/detect.js"></script>
     <script src="/js/qr.js"></script>
     <script src="/js/transfer.js"></script>
