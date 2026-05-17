@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://crossdrop-yjib.onrender.com';
+// BACKEND_URL is defined in config.js — loaded before this file
 
 window.myName = generateDeviceName();
 

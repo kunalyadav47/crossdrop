@@ -1,5 +1,4 @@
-// 🔧 REPLACE THIS URL with your Render backend URL after deploying server
-const BACKEND_URL = 'YOUR_RENDER_BACKEND_URL'; // e.g. https://crossdrop-backend.onrender.com
+// BACKEND_URL is defined in app.js — do not redefine here
 const socket = io(BACKEND_URL, {
   transports: ['websocket'],
   upgrade: false
