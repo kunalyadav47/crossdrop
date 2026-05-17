@@ -29,6 +29,28 @@
 
         <!-- HOME VIEW -->
         <main id="view-home" class="view active">
+            <div class="data-guarantee">
+                <div class="data-guarantee-icon">🛡️</div>
+                <div class="data-guarantee-text">
+                    <strong>$0 Mobile Data Guarantee</strong>
+                    <small>Transfers run on your LAN only — physically cannot use cellular data.</small>
+                </div>
+            </div>
+
+            <details class="advanced-settings">
+                <summary>Advanced</summary>
+                <div class="advanced-settings-content">
+                    <label class="lan-toggle" for="allow-internet-toggle">
+                        <input type="checkbox" id="allow-internet-toggle">
+                        <span class="lan-toggle-track"><span class="lan-toggle-thumb"></span></span>
+                        <span class="lan-toggle-text">
+                            🌐 Allow Internet Route
+                            <small>Off = LAN only ($0 data). On = also works across networks (uses data).</small>
+                        </span>
+                    </label>
+                </div>
+            </details>
+
             <div class="action-buttons">
                 <button id="btn-send" class="primary-btn">
                     <span class="icon">📤</span>
@@ -84,7 +106,7 @@
                 <div class="connected-checkmark">✓</div>
                 <div>
                     <div class="connected-title">Connected!</div>
-                    <div class="connected-peer">with <span id="peer-name">...</span></div>
+                    <div class="connected-peer">with <span id="peer-name">...</span><div id="connection-type-badge" class="hidden conn-badge"></div></div>
                 </div>
                 <button id="btn-disconnect" class="disconnect-btn" title="Disconnect">✕</button>
             </div>

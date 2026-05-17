@@ -1,4 +1,4 @@
-const CACHE_NAME = 'crossdrop-v2';
+const CACHE_NAME = 'crossdrop-v4-lan-locked';
 const ASSETS = [
     '/',
     '/index.html',

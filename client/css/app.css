@@ -229,3 +229,33 @@ h2 { margin-bottom: 20px; text-align: center; font-size: 22px; font-weight: 700;
 .danger-btn  { background: var(--danger-color);  color: white; }
 
 .hidden { display: none !important; }
+
+/* ── LAN & Data Guarantee ── */
+.data-guarantee { background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(20,184,166,0.1)); border: 1px solid rgba(16,185,129,0.35); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start; transition: all 0.3s ease; }
+.data-guarantee-icon { font-size: 24px; line-height: 1; }
+.data-guarantee-text strong { color: var(--success-color); display: block; margin-bottom: 4px; font-size: 15px; }
+.data-guarantee-text small { color: var(--text-muted); font-size: 13px; line-height: 1.4; display: block; }
+
+.data-guarantee-off { background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.1)); border-color: rgba(245,158,11,0.35); }
+.data-guarantee-off .data-guarantee-text strong { color: #f59e0b; }
+
+.advanced-settings { background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid var(--card-border); overflow: hidden; margin-bottom: 20px; }
+.advanced-settings summary { padding: 14px 16px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-muted); list-style: none; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+.advanced-settings summary::-webkit-details-marker { display: none; }
+.advanced-settings summary::after { content: '+'; font-size: 18px; }
+.advanced-settings[open] summary::after { content: '−'; }
+.advanced-settings-content { padding: 0 16px 16px 16px; }
+
+.lan-toggle { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; margin-top: 8px; }
+.lan-toggle input { display: none; }
+.lan-toggle-track { width: 44px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; position: relative; transition: background 0.3s; flex-shrink: 0; margin-top: 2px; }
+.lan-toggle-thumb { width: 20px; height: 20px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: transform 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.lan-toggle input:checked + .lan-toggle-track { background: #f59e0b; }
+.lan-toggle input:checked + .lan-toggle-track .lan-toggle-thumb { transform: translateX(20px); }
+.lan-toggle-text { font-size: 15px; font-weight: 600; color: var(--text-color); }
+.lan-toggle-text small { display: block; font-weight: normal; font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+.conn-badge { display: inline-flex; align-items: center; justify-content: center; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: 12px; vertical-align: middle; }
+.badge-lan { background: rgba(16,185,129,0.15); color: var(--success-color); border: 1px solid rgba(16,185,129,0.3); }
+.badge-internet { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.badge-relay { background: rgba(239,68,68,0.15); color: var(--danger-color); border: 1px solid rgba(239,68,68,0.3); }

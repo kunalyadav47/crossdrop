@@ -73,6 +73,41 @@ window.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('crossdrop_tip_shown', 'true');
     });
 
+    // ── Advanced: Allow Internet Route Toggle ──
+    const internetToggle = document.getElementById('allow-internet-toggle');
+    if (internetToggle) {
+        const saved = localStorage.getItem('crossdrop_allow_internet') === 'true';
+        internetToggle.checked = saved;
+        WebRTC.allowInternetRoute = saved;
+        WebRTC.localOnly = true; // Hardcode default localOnly safety
+        
+        internetToggle.addEventListener('change', () => {
+            WebRTC.allowInternetRoute = internetToggle.checked;
+            localStorage.setItem('crossdrop_allow_internet', internetToggle.checked);
+            
+            const guarantee = document.querySelector('.data-guarantee');
+            if (guarantee) {
+                guarantee.classList.toggle('data-guarantee-off', internetToggle.checked);
+                const small = guarantee.querySelector('small');
+                if (small) {
+                    small.textContent = internetToggle.checked
+                        ? '⚠️ Internet route enabled — transfers may use mobile data.'
+                        : 'Transfers run on your LAN only — physically cannot use cellular data.';
+                }
+            }
+        });
+        
+        // Trigger UI update immediately for loaded state
+        if (saved) {
+            const guarantee = document.querySelector('.data-guarantee');
+            if (guarantee) {
+                guarantee.classList.add('data-guarantee-off');
+                const small = guarantee.querySelector('small');
+                if (small) small.textContent = '⚠️ Internet route enabled — transfers may use mobile data.';
+            }
+        }
+    }
+
     // ── Service Worker with forced update ──
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').then(reg => {
@@ -121,6 +156,12 @@ function _resetToHome() {
     document.getElementById('speed-bar-wrap').classList.add('hidden');
     document.getElementById('speed-bar-fill').style.width = '0%';
     document.getElementById('transfer-speed-label').textContent = '⚡ 0 MB/s';
+
+    const badge = document.getElementById('connection-type-badge');
+    if (badge) {
+        badge.className = 'hidden conn-badge';
+        badge.textContent = '';
+    }
 
     showView('home');
 }
