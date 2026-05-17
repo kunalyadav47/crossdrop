@@ -2,9 +2,10 @@ const QRScanner = {
     stream: null,
     interval: null,
     start(videoEl, onScan) {
+        const label = document.querySelector('.manual-entry span');
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.warn("Camera API not available. This usually requires HTTPS or localhost.");
-            // Script won't crash now. User can gracefully use manual fallback code input.
+            console.warn("Camera API not available.");
+            if (label) label.textContent = "Camera unavailable. Enter code:";
             return;
         }
 
@@ -33,6 +34,7 @@ const QRScanner = {
             }, 500);
         }).catch(err => {
             console.warn("Camera access denied or unavailable", err);
+            if (label) label.textContent = "Camera blocked. Enter code:";
         });
     },
     stop() {
@@ -47,15 +49,23 @@ const QRScanner = {
     }
 };
 
-function generateQR(text, canvas) {
-    QRCode.toCanvas(canvas, text, {
+function generateQR(text, imgEl) {
+    if (typeof QRCode === 'undefined') {
+        console.error("QRCode library failed to load");
+        return;
+    }
+    QRCode.toDataURL(text, {
         width: 250,
         margin: 2,
         color: {
             dark: "#000000",
             light: "#ffffff"
         }
-    }, function (error) {
-        if (error) console.error(error);
+    }, function (error, url) {
+        if (error) {
+            console.error("QR Error", error);
+        } else {
+            imgEl.src = url;
+        }
     });
 }
