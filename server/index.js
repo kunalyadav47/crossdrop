@@ -17,7 +17,7 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Health check route (Render needs this to confirm server is alive)
+// Health check route
 app.get('/', (req, res) => {
   res.send('CrossDrop signaling server is running.');
 });
@@ -34,6 +34,10 @@ io.on('connection', (socket) => {
     socket.on('join-room', (roomId, deviceName) => {
         socket.join(roomId);
         socket.to(roomId).emit('user-joined', socket.id, deviceName);
+    });
+
+    socket.on('name-reply', (targetId, deviceName) => {
+        socket.to(targetId).emit('name-reply', socket.id, deviceName);
     });
 
     socket.on('offer', (roomId, offer) => {

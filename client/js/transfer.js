@@ -226,13 +226,7 @@ window.FileTransfer = {
     onMessage(data) {
         if (typeof data === 'string') {
             const msg = JSON.parse(data);
-            if (msg.type === 'name') {
-                if (WebRTC.isSender) {
-                    document.getElementById('receiver-name').textContent = msg.name;
-                } else {
-                    document.getElementById('sender-name').textContent = msg.name;
-                }
-            } else if (msg.type === 'meta') {
+            if (msg.type === 'meta') {
                 this.incomingMeta = msg;
                 document.getElementById('incoming-filename').textContent = msg.filename;
                 document.getElementById('incoming-filesize').textContent = (msg.originalSize / (1024*1024)).toFixed(2) + ' MB';

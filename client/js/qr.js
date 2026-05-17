@@ -2,8 +2,13 @@ const QRScanner = {
     stream: null,
     interval: null,
     start(videoEl, onScan) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.warn("Camera API not available. This usually requires HTTPS or localhost.");
+            // Script won't crash now. User can gracefully use manual fallback code input.
+            return;
+        }
+
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
-            document.getElementById('scanner-overlay').innerHTML = ''; // Clear error if any
             QRScanner.stream = stream;
             videoEl.srcObject = stream;
             videoEl.setAttribute("playsinline", true);
@@ -28,10 +33,6 @@ const QRScanner = {
             }, 500);
         }).catch(err => {
             console.warn("Camera access denied or unavailable", err);
-            const overlay = document.getElementById('scanner-overlay');
-            if (overlay) {
-                overlay.innerHTML = '<div style="color:var(--danger-color); padding: 40px 20px; text-align: center; background: rgba(0,0,0,0.8); width:100%; height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column; gap: 10px;"><span>📷 Camera Blocked</span><span style="font-size:12px; color:var(--text-muted);">Type code manually below</span></div>';
-            }
         });
     },
     stop() {

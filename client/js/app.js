@@ -22,7 +22,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-send').addEventListener('click', () => {
         showView('send');
-        WebRTC.startSender();
         QRScanner.start(document.getElementById('scanner-video'), (code) => {
             QRScanner.stop();
             document.getElementById('manual-code').value = code;
