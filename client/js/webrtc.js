@@ -1,4 +1,9 @@
-const socket = io(); // Auto-connects to host serving the page
+// 🔧 REPLACE THIS URL with your Render backend URL after deploying server
+const BACKEND_URL = 'YOUR_RENDER_BACKEND_URL'; // e.g. https://crossdrop-backend.onrender.com
+const socket = io(BACKEND_URL, {
+  transports: ['websocket'],
+  upgrade: false
+});
 
 const WebRTC = {
     peer: null,

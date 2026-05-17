@@ -1,3 +1,5 @@
+const BACKEND_URL = 'http://localhost:3000';
+
 window.myName = generateDeviceName();
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -80,3 +82,9 @@ window.addEventListener('load', async () => {
         }
     }
 });
+
+// Keep Render free server alive — ping every 10 minutes
+setInterval(() => {
+  fetch(BACKEND_URL + '/')
+    .catch(() => {}); // silent fail is fine
+}, 10 * 60 * 1000);

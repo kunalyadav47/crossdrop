@@ -27,7 +27,7 @@ function generateDeviceName() {
 async function measureBandwidth() {
     try {
         const start = performance.now();
-        const resp = await fetch('/speedtest');
+        const resp = await fetch(BACKEND_URL + '/speedtest');
         const blob = await resp.blob();
         const end = performance.now();
         const duration = (end - start) / 1000;

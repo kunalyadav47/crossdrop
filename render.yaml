@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: crossdrop-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  - type: web
+    name: crossdrop-frontend
+    env: static
+    rootDir: client
+    buildCommand: echo "no build needed"
+    staticPublishPath: .
+    plan: free

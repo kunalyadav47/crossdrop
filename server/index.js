@@ -2,29 +2,32 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
 app.use(cors());
+app.use(express.json());
 
-// Serve static client files
-app.use(express.static(path.join(__dirname, '../client')));
+// Health check route (Render needs this to confirm server is alive)
+app.get('/', (req, res) => {
+  res.send('CrossDrop signaling server is running.');
+});
 
-// Speedtest payload (2MB) for measuring bandwidth locally
+// Speedtest payload (2MB) for measuring bandwidth
 const speedtestPayload = crypto.randomBytes(1024 * 1024 * 2);
 app.get('/speedtest', (req, res) => {
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Cache-Control', 'no-store');
     res.send(speedtestPayload);
-});
-
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
 });
 
 io.on('connection', (socket) => {
@@ -55,6 +58,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`CrossDrop signaling server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`CrossDrop server running on port ${PORT}`);
 });
