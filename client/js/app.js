@@ -1,192 +1,149 @@
-// BACKEND_URL is defined in config.js — loaded before this file
-
-window.myName = generateDeviceName();
-
-window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('my-device-name').textContent = window.myName;
-
-    const views = {
-        home:      document.getElementById('view-home'),
-        send:      document.getElementById('view-send'),
-        receive:   document.getElementById('view-receive'),
-        connected: document.getElementById('view-connected'),
-    };
-
-    // ── View switcher (inline style, avoids CSS class conflicts) ──
-    window.showView = function(viewName) {
-        Object.values(views).forEach(v => { v.style.display = 'none'; });
-        if (views[viewName]) views[viewName].style.display = 'flex';
-    };
-
-    // Start on home
-    showView('home');
-
-    // ── SEND button — opens QR scanner to scan receiver's QR ──
-    document.getElementById('btn-send').addEventListener('click', () => {
-        showView('send');
-        QRScanner.start(document.getElementById('scanner-video'), (code) => {
-            QRScanner.stop();
-            document.getElementById('manual-code').value = code;
-            WebRTC.joinRoom(code);
-        });
-    });
-
-    // ── RECEIVE button — generates room code and QR ──
-    document.getElementById('btn-receive').addEventListener('click', () => {
-        showView('receive');
-        WebRTC.startReceiver();
-    });
-
-    // ── Manual code connect ──
-    document.getElementById('join-btn').addEventListener('click', () => {
-        const code = document.getElementById('manual-code').value.trim().toUpperCase();
-        if (code.length === 6) {
-            QRScanner.stop();
-            WebRTC.joinRoom(code);
-        } else {
-            document.getElementById('send-waiting').textContent = '⚠️ Enter a 6-character code.';
-            document.getElementById('send-waiting').classList.remove('hidden');
-        }
-    });
-
-    // Allow pressing Enter in the code input
-    document.getElementById('manual-code').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') document.getElementById('join-btn').click();
-    });
-
-    // ── Back buttons (all views) ──
-    document.querySelectorAll('.back-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            _resetToHome();
-        });
-    });
-
-    // ── Disconnect button on the connected dashboard ──
-    document.getElementById('btn-disconnect').addEventListener('click', () => {
-        WebRTC.disconnect();
-        _resetToHome();
-    });
-
-    // ── WiFi tip dismiss ──
-    document.getElementById('close-tip').addEventListener('click', () => {
-        document.getElementById('wifi-tip').classList.add('hidden');
-        localStorage.setItem('crossdrop_tip_shown', 'true');
-    });
-
-    // ── Advanced: Network Mode Radio Buttons ──
-    const radios = document.querySelectorAll('input[name="net_mode"]');
-    const guarantee = document.getElementById('data-guarantee-banner');
-    
-    function updateNetworkModeUI(mode) {
-        if (!guarantee) return;
-        const small = guarantee.querySelector('small');
-        
-        guarantee.className = 'data-guarantee'; // reset classes
-        if (mode === 'strict') {
-            small.textContent = 'Strict LAN mode active. Cannot use cellular data.';
-        } else if (mode === 'wifi') {
-            guarantee.classList.add('data-guarantee-off');
-            small.textContent = 'WiFi routing allowed. Will refuse cellular paths.';
-        } else if (mode === 'any') {
-            guarantee.classList.add('data-guarantee-off');
-            // Make it red for ANY
-            guarantee.style.borderColor = 'rgba(239,68,68,0.5)';
-            guarantee.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))';
-            small.textContent = '⚠️ WARNING: Any network route allowed (May use Mobile Data).';
-        }
+document.addEventListener('DOMContentLoaded', async () => {
+    // ---- PWA Service Worker ----
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.error("SW reg failed", err));
     }
 
+    // ---- Init ----
+    window.myName = window.DeviceDetect ? window.DeviceDetect.generateName() : 'Unknown Device';
+    document.getElementById('my-device-name').textContent = window.myName;
+    
+    if (window.Feedback) window.Feedback.init();
+
+    // ---- Mute Toggle ----
+    const muteToggle = document.getElementById('mute-toggle');
+    if (muteToggle && window.Feedback) {
+        muteToggle.checked = window.Feedback.muted;
+        muteToggle.addEventListener('change', (e) => {
+            window.Feedback.muted = e.target.checked;
+            localStorage.setItem('crossdrop_muted', window.Feedback.muted);
+        });
+    }
+
+    // ---- Network Mode Toggle ----
+    const radios = document.querySelectorAll('input[name="net_mode"]');
     if (radios.length > 0) {
         const savedMode = localStorage.getItem('crossdrop_net_mode') || 'strict';
         WebRTC.networkMode = savedMode;
-        
-        radios.forEach(radio => {
-            if (radio.value === savedMode) radio.checked = true;
-            
-            radio.addEventListener('change', (e) => {
+        radios.forEach(r => {
+            if (r.value === savedMode) r.checked = true;
+            r.addEventListener('change', (e) => {
                 if (e.target.checked) {
                     WebRTC.networkMode = e.target.value;
                     localStorage.setItem('crossdrop_net_mode', e.target.value);
-                    if (guarantee) guarantee.style = ''; // clear inline styles
-                    updateNetworkModeUI(e.target.value);
                 }
             });
         });
-        
-        updateNetworkModeUI(savedMode);
     }
 
-    // ── Service Worker with forced update ──
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').then(reg => {
-            reg.addEventListener('updatefound', () => {
-                const newWorker = reg.installing;
-                newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-                        window.location.reload();
-                    }
-                });
-            });
-        }).catch(err => console.log('SW error:', err));
+    // ---- Preflight Probe ----
+    window.runDiagnostics = async function() {
+        const pill = document.getElementById('preflight-pill');
+        const text = document.getElementById('preflight-text');
+        if (!pill || !window.Preflight) return;
+        
+        pill.className = 'preflight-pill pill-wait';
+        text.textContent = 'Checking...';
+        
+        const result = await window.Preflight.run();
+        text.textContent = result.status;
+        
+        if (result.status.includes('Ready')) pill.className = 'preflight-pill pill-ready';
+        else if (result.status.includes('Hotspot')) pill.className = 'preflight-pill pill-warn';
+        else pill.className = 'preflight-pill pill-error';
+        
+        pill.onclick = () => {
+            if (result.hotspotSuspected || result.status.includes('No WiFi')) {
+                if(window.Wizard) window.Wizard.show();
+            } else {
+                alert(result.message + "\nIPs: " + result.ips.join(', '));
+            }
+        };
+    };
+    
+    runDiagnostics();
 
-        let refreshing;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) return;
-            refreshing = true;
-            window.location.reload();
+    // ---- Views ----
+    window.showView = function(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+        if (viewId === 'home') runDiagnostics();
+    };
+
+    // ---- Buttons ----
+    document.getElementById('btn-send').addEventListener('click', () => {
+        showView('send');
+        if(window.QRScanner) window.QRScanner.startScanner();
+    });
+
+    document.getElementById('btn-receive').addEventListener('click', () => {
+        showView('receive');
+        WebRTC.startReceiver();
+        // Register lobby to show nearby devices
+        if(typeof socket !== 'undefined' && socket.connected) {
+            socket.emit('register-lobby', window.myName);
+        }
+    });
+
+    document.querySelectorAll('.back-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if(window.QRScanner) window.QRScanner.stopScanner();
+            if(WebRTC.connected) WebRTC.disconnect();
+            showView('home');
+        });
+    });
+
+    document.getElementById('join-btn').addEventListener('click', () => {
+        const code = document.getElementById('manual-code').value.toUpperCase();
+        if (code.length === 6) {
+            if(window.QRScanner) window.QRScanner.stopScanner();
+            WebRTC.joinRoom(code);
+        } else {
+            alert("Enter a 6-character code");
+        }
+    });
+
+    document.getElementById('btn-disconnect').addEventListener('click', () => {
+        WebRTC.disconnect();
+        showView('home');
+    });
+
+    // ---- File Selection ----
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    
+    if (dropZone) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'var(--accent-lime)';
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = 'var(--card-border)';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = 'var(--card-border)';
+            if (e.dataTransfer.files.length) {
+                window.FileTransfer.queueFiles(e.dataTransfer.files);
+            }
+        });
+        
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                window.FileTransfer.queueFiles(fileInput.files);
+            }
+            fileInput.value = '';
         });
     }
+
+    // Modal buttons
+    document.getElementById('btn-accept').addEventListener('click', () => {
+        document.getElementById('incoming-modal').classList.add('hidden');
+        window.FileTransfer.acceptCurrentFile();
+    });
+    document.getElementById('btn-decline').addEventListener('click', () => {
+        document.getElementById('incoming-modal').classList.add('hidden');
+        window.FileTransfer.declineCurrentFile();
+    });
 });
-
-// ── Reset everything back to home ──
-function _resetToHome() {
-    QRScanner.stop();
-    WebRTC.disconnect();
-
-    // Reset send view
-    document.getElementById('send-setup').style.display = '';
-    document.getElementById('send-waiting').classList.add('hidden');
-    document.getElementById('send-waiting').textContent = '';
-    document.getElementById('manual-code').value = '';
-
-    // Reset receive view
-    document.getElementById('receive-setup').style.display = '';
-    document.getElementById('receive-waiting').classList.add('hidden');
-    document.getElementById('receive-waiting').textContent = '';
-    document.getElementById('qr-container').innerHTML = '';
-    document.getElementById('room-code').textContent = '------';
-
-    // Reset connected view
-    document.getElementById('sender-panel').classList.add('hidden');
-    document.getElementById('receiver-panel').classList.add('hidden');
-    document.getElementById('send-queue').innerHTML = '';
-    document.getElementById('receive-queue').innerHTML = '';
-    document.getElementById('speed-bar-wrap').classList.add('hidden');
-    document.getElementById('speed-bar-fill').style.width = '0%';
-    document.getElementById('transfer-speed-label').textContent = '⚡ 0 MB/s';
-
-    const badge = document.getElementById('connection-type-badge');
-    if (badge) {
-        badge.className = 'hidden conn-badge';
-        badge.textContent = '';
-    }
-
-    showView('home');
-}
-
-// ── Bandwidth check for 5GHz tip ──
-window.addEventListener('load', async () => {
-    if (!localStorage.getItem('crossdrop_tip_shown')) {
-        const speed = await measureBandwidth();
-        if (speed < 15) {
-            document.getElementById('wifi-tip').classList.remove('hidden');
-        } else {
-            localStorage.setItem('crossdrop_tip_shown', 'true');
-        }
-    }
-});
-
-// ── Keep Render free server alive ──
-setInterval(() => {
-    fetch(BACKEND_URL + '/').catch(() => {});
-}, 10 * 60 * 1000);

@@ -141,6 +141,8 @@ window.FileTransfer = {
         };
 
         this.sendControl(meta);
+        if(window.Orbit) window.Orbit.start();
+        if(window.Feedback) window.Feedback.play('start');
 
         return new Promise((resolve) => {
             this.onAccept = async () => {
@@ -200,6 +202,8 @@ window.FileTransfer = {
 
                 clearInterval(speedInt);
                 this.sendControl({ type: 'done', id: item.id });
+                if(window.Orbit) window.Orbit.complete();
+                if(window.Feedback) window.Feedback.play('complete');
                 document.getElementById(`prog-${item.id}`).style.width = '100%';
                 document.getElementById(`prog-${item.id}`).style.background = 'var(--success-color)';
                 this.hideSpeedUI();
@@ -229,6 +233,7 @@ window.FileTransfer = {
                 document.getElementById('incoming-modal').classList.remove('hidden');
 
                 this.addFileToUI({ name: msg.filename, size: msg.originalSize }, msg.id, 'receive-queue');
+                if(window.Feedback) window.Feedback.play('start');
             } else if (msg.type === 'accept') {
                 if (this.onAccept) this.onAccept();
             } else if (msg.type === 'decline') {
@@ -300,6 +305,8 @@ window.FileTransfer = {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        if(window.Orbit) window.Orbit.complete();
+        if(window.Feedback) window.Feedback.play('complete');
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 };

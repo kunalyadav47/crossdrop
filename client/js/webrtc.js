@@ -232,9 +232,10 @@ const WebRTC = {
             else this.connectionType = 'internet';
 
             this.connected = true;
+            if(window.Feedback) window.Feedback.play('paired');
             this.onConnected(this._peerName);
 
-            this.startTelemetrySentinel();
+            if(window.TrustPanel) window.TrustPanel.start(this.peer);
 
         } catch (e) {
             console.error("Verification failed", e);
@@ -244,62 +245,14 @@ const WebRTC = {
             }
             this.connectionType = 'unknown';
             this.connected = true;
+            if(window.Feedback) window.Feedback.play('paired');
             this.onConnected(this._peerName);
-            this.startTelemetrySentinel();
+            if(window.TrustPanel) window.TrustPanel.start(this.peer);
         }
     },
 
     startTelemetrySentinel() {
-        if (this.telemetryInterval) clearInterval(this.telemetryInterval);
-        this.telemetryInterval = setInterval(async () => {
-            if (!this.peer || !this.connected) return;
-            try {
-                const stats = await this.peer.getStats();
-                let bytesSent = 0, bytesReceived = 0, rtt = 0;
-                let localType = '', remoteType = '', localIp = '', remoteIp = '';
-                let networkType = 'unknown';
-
-                stats.forEach(report => {
-                    if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                        bytesSent = report.bytesSent || 0;
-                        bytesReceived = report.bytesReceived || 0;
-                        rtt = report.currentRoundTripTime || 0;
-                        const localCand = stats.get(report.localCandidateId);
-                        const remoteCand = stats.get(report.remoteCandidateId);
-                        if (localCand) {
-                            localType = localCand.candidateType;
-                            localIp = localCand.ip || localCand.address;
-                            networkType = localCand.networkType || 'unknown';
-                        }
-                        if (remoteCand) {
-                            remoteType = remoteCand.candidateType;
-                            remoteIp = remoteCand.ip || remoteCand.address;
-                        }
-                    }
-                });
-
-                // Defensive cellular detection
-                if (this.networkMode !== 'any') {
-                    if (networkType === 'cellular') {
-                        console.error("Sentinel detected cellular route mid-transfer!");
-                        this.disconnect();
-                        alert("🛑 Transfer aborted — cellular route detected mid-transfer. Your data is safe.");
-                        return;
-                    }
-                }
-
-                const pre = document.getElementById('telemetry-log');
-                if (pre) {
-                    pre.innerHTML = `🛡️ Network Mode:   ${this.networkMode.toUpperCase()}
-├─ Local interface:  ${localType} (${localIp}) [${networkType}]
-├─ Remote interface: ${remoteType} (${remoteIp})
-├─ Route Type:       ${this.connectionType}
-├─ Sent Data:        ${(bytesSent / 1024 / 1024).toFixed(2)} MB
-├─ Received Data:    ${(bytesReceived / 1024 / 1024).toFixed(2)} MB
-└─ RTT Latency:      ${(rtt * 1000).toFixed(1)} ms`;
-                }
-            } catch(e) {}
-        }, 1000);
+        // Obsolete: TrustPanel now handles live telemetry.
     },
 
     async makeOffer() {
@@ -321,24 +274,6 @@ const WebRTC = {
 
         document.getElementById('peer-name').textContent = peerName || 'Unknown Device';
 
-        const badge = document.getElementById('connection-type-badge');
-        if (badge) {
-            badge.className = 'conn-badge'; // reset
-            badge.classList.remove('hidden');
-            if (this.connectionType === 'lan') {
-                badge.classList.add('badge-lan');
-                badge.textContent = '🚀 Pure LAN';
-            } else if (this.connectionType === 'internet') {
-                badge.classList.add('badge-internet');
-                badge.textContent = '🌐 Public IP Route';
-            } else if (this.connectionType === 'relay') {
-                badge.classList.add('badge-relay');
-                badge.textContent = '🐢 TURN Relay';
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-
         if (this.isSender) {
             document.getElementById('sender-panel').classList.remove('hidden');
             document.getElementById('receiver-panel').classList.add('hidden');
@@ -351,7 +286,8 @@ const WebRTC = {
     },
 
     disconnect() {
-        if (this.telemetryInterval) clearInterval(this.telemetryInterval);
+        if(window.TrustPanel) window.TrustPanel.stop();
+        if(window.Orbit) window.Orbit.stop();
         if (this.peer) { this.peer.close(); this.peer = null; }
         this.dataChannels = [];
         this.connected = false;

@@ -5,173 +5,147 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CrossDrop - AirDrop for everyone</title>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#121212">
+    <meta name="theme-color" content="#0A0A0A">
     <link rel="stylesheet" href="/css/app.css">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 </head>
 <body>
     <div id="app">
-        <div id="wifi-tip" class="hidden banner">
-            💡 Switch your hotspot to 5GHz in settings for 2x faster transfers
-            <button id="close-tip">&times;</button>
-        </div>
-
-        <header>
-            <div class="logo-container">
-                <div class="logo-icon"></div>
-                <h1>CrossDrop</h1>
-            </div>
-            <p class="tagline">AirDrop for everyone</p>
-            <div id="network-status" class="status">
-                <span class="dot"></span> <span id="status-text">Connecting...</span>
-            </div>
-        </header>
-
+        <!-- HOME VIEW -->
         <main id="view-home" class="view active">
-            <div class="data-guarantee" id="data-guarantee-banner">
-                <div class="data-guarantee-icon">🛡️</div>
-                <div class="data-guarantee-text">
-                    <strong>$0 Mobile Data Guarantee</strong>
-                    <small>Strict LAN mode active. Cannot use cellular data.</small>
-                </div>
+            <h1>CrossDrop</h1>
+            <p class="tagline">Pure-WiFi file beam</p>
+
+            <div id="preflight-pill" class="preflight-pill pill-wait" tabindex="0" aria-label="Network Status">
+                <span class="pill-icon">⚪</span> <span id="preflight-text">Checking...</span>
             </div>
 
-            <details class="advanced-settings">
-                <summary>Advanced Network Rules</summary>
-                <div class="advanced-settings-content">
-                    <div class="network-mode-selector">
-                        <label class="net-radio">
-                            <input type="radio" name="net_mode" value="strict" checked>
-                            <div class="net-radio-content">
-                                <b>🛡️ Strict LAN Only</b>
-                                <span>Refuses any internet route. Direct P2P only.</span>
-                            </div>
-                        </label>
-                        <label class="net-radio">
-                            <input type="radio" name="net_mode" value="wifi">
-                            <div class="net-radio-content">
-                                <b>🌐 WiFi Network OK</b>
-                                <span>Allows WiFi router internet, refuses cellular.</span>
-                            </div>
-                        </label>
-                        <label class="net-radio">
-                            <input type="radio" name="net_mode" value="any">
-                            <div class="net-radio-content">
-                                <b>📶 Any Network OK</b>
-                                <span>Allows cellular and internet paths (Uses Data).</span>
-                            </div>
-                        </label>
-                    </div>
+            <div class="beam-container">
+                <div class="pulse-ring"></div>
+                <div class="pulse-ring"></div>
+                <div class="pulse-ring"></div>
+                <div class="beam-radial">
+                    📡
+                    <div class="beam-text">BEAM</div>
                 </div>
-            </details>
+            </div>
 
             <div class="action-buttons">
-                <button id="btn-send" class="primary-btn">
+                <button id="btn-send" class="action-btn" aria-label="Send Files">
                     <span class="icon">📤</span>
-                    <span class="text">Send Files</span>
+                    Send
                 </button>
-                <button id="btn-receive" class="secondary-btn">
+                <button id="btn-receive" class="action-btn" aria-label="Receive Files">
                     <span class="icon">📥</span>
-                    <span class="text">Receive Files</span>
+                    Receive
                 </button>
             </div>
-            <div class="device-info">
-                You are known as: <strong id="my-device-name">...</strong>
+
+            <div class="home-trust-banner">
+                <div><span>🛡️ Cellular bytes used:</span> <span class="cell-zero">0 KB</span></div>
+                <div><span>📡 You are:</span> <strong id="my-device-name">...</strong></div>
             </div>
+
+            <details class="advanced">
+                <summary>⚙ Advanced ⌄</summary>
+                <div class="adv-content">
+                    <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:14px; margin-bottom:12px;">
+                        <span>Mute Sounds</span>
+                        <input type="checkbox" id="mute-toggle" style="accent-color: var(--accent-lime); width: 16px; height: 16px;">
+                    </label>
+                    
+                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Network Route:</div>
+                    <label style="display:block; margin-bottom:8px; font-size:14px; cursor:pointer;"><input type="radio" name="net_mode" value="strict" checked> 🛡️ Strict LAN</label>
+                    <label style="display:block; margin-bottom:8px; font-size:14px; cursor:pointer;"><input type="radio" name="net_mode" value="wifi"> 🌐 WiFi Router</label>
+                    <label style="display:block; font-size:14px; cursor:pointer;"><input type="radio" name="net_mode" value="any"> 📶 Any (Uses Data)</label>
+                </div>
+            </details>
         </main>
 
-        <!-- SEND VIEW — Sender scans QR or types code from Receiver -->
-        <main id="view-send" class="view" style="display:none;">
+        <!-- SEND VIEW -->
+        <main id="view-send" class="view">
             <button class="back-btn">← Back</button>
             <h2>Send Files</h2>
             <div id="send-setup" class="setup-container">
                 <div class="scanner-container">
                     <video id="scanner-video" playsinline muted></video>
-                    <div class="scanner-overlay"></div>
                 </div>
-                <p style="color:var(--text-muted);font-size:14px;">Scan the QR code shown on the receiver's screen.</p>
-                <div class="manual-entry">
-                    <input type="text" id="manual-code" maxlength="6" placeholder="Or type code here" autocomplete="off" autocorrect="off" spellcheck="false">
-                    <button id="join-btn">Connect</button>
-                </div>
+                <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">Scan the QR code shown on the receiver's screen.</p>
+                <input type="text" id="manual-code" maxlength="6" placeholder="Or type code here" autocomplete="off">
+                <button id="join-btn" class="join-btn">Connect</button>
                 <div class="waiting-text hidden" id="send-waiting"></div>
             </div>
         </main>
 
-        <!-- RECEIVE VIEW — Receiver shows QR and code, waits -->
-        <main id="view-receive" class="view" style="display:none;">
+        <!-- RECEIVE VIEW -->
+        <main id="view-receive" class="view">
             <button class="back-btn">← Back</button>
             <h2>Receive Files</h2>
             <div id="receive-setup" class="setup-container">
+                <!-- Lobby row goes here dynamically via lobby.js -->
+                
                 <div id="qr-container"></div>
-                <div class="room-code-display">
-                    Code: <strong id="room-code">------</strong>
-                </div>
-                <p style="color:var(--text-muted);font-size:14px;">Share this code or let the sender scan the QR above.</p>
+                <div class="room-code-display" id="room-code">------</div>
+                <p style="color:var(--text-muted);font-size:14px;">Share this code or let the sender scan the QR.</p>
                 <div class="waiting-text">Waiting for sender...</div>
                 <div class="waiting-text hidden" id="receive-waiting"></div>
             </div>
         </main>
 
-        <!-- CONNECTED DASHBOARD — shown to BOTH sender and receiver after pairing -->
-        <main id="view-connected" class="view" style="display:none;">
-            <!-- Connection success banner -->
-            <div class="connected-banner">
-                <div class="connected-checkmark">✓</div>
-                <div>
-                    <div class="connected-title">Connected!</div>
-                    <div class="connected-peer">with <span id="peer-name">...</span><div id="connection-type-badge" class="hidden conn-badge"></div></div>
-                </div>
-                <button id="btn-disconnect" class="disconnect-btn" title="Disconnect">✕</button>
-            </div>
+        <!-- CONNECTED DASHBOARD -->
+        <main id="view-connected" class="view">
+            <button id="btn-disconnect" class="back-btn" title="Disconnect">✕ Disconnect</button>
             
-            <details class="telemetry-panel" id="telemetry-panel">
-                <summary>📊 Connection Diagnostics</summary>
-                <pre id="telemetry-log">Loading stats...</pre>
-            </details>
+            <canvas id="orbit-canvas" class="hidden" width="320" height="120"></canvas>
 
-            <!-- Speed indicator -->
-            <div class="speed-bar-wrap hidden" id="speed-bar-wrap">
-                <span id="transfer-speed-label">⚡ 0 MB/s</span>
-                <div class="speed-bar-bg"><div class="speed-bar-fill" id="speed-bar-fill"></div></div>
+            <div id="trust-panel" class="trust-panel hidden">
+                <div class="tp-header"><span class="icon">🛡️</span> PURE LAN VERIFIED</div>
+                <div class="tp-row"><span>Your route:</span> <span id="tp-route-loc">-</span></div>
+                <div class="tp-row"><span>Peer route:</span> <span id="tp-route-rem">-</span></div>
+                <div class="tp-row"><span>Path:</span> <span id="tp-path">-</span></div>
+                <div class="tp-row"><span>RTT:</span> <span id="tp-rtt">-</span></div>
+                <div class="tp-row"><span>Channels:</span> <span id="tp-channels"></span></div>
+                <div class="tp-divider"></div>
+                <div class="tp-row"><span>Cellular:</span> <span id="tp-cell" style="color:var(--accent-lime); font-weight:bold;">0 KB ✓</span></div>
+                <div class="tp-row"><span>WiFi sent:</span> <span id="tp-sent">0.00 MB</span></div>
+                <div class="tp-row"><span>WiFi recv:</span> <span id="tp-recv">0.00 MB</span></div>
+                <div class="tp-speed-row">
+                    <span id="transfer-speed-label">⚡ 0 MB/s</span>
+                    <span id="transfer-time-label">⏱ 00:00</span>
+                </div>
             </div>
 
-            <!-- SENDER: File drop zone (only shown when isSender) -->
-            <div id="sender-panel" class="panel hidden">
+            <!-- SENDER: Drop zone -->
+            <div id="sender-panel" class="hidden">
                 <div id="drop-zone" class="drop-zone">
                     <input type="file" id="file-input" multiple hidden>
-                    <div class="drop-content">
-                        <div class="drop-icon">📁</div>
-                        <p class="drop-title">Tap to select files</p>
-                        <p class="drop-sub">or drag & drop here</p>
-                    </div>
+                    <div style="font-size:32px; margin-bottom:8px;">📁</div>
+                    <p style="font-size:16px; font-weight:500;">Tap to select files</p>
                 </div>
-                <div id="send-queue" class="file-list"></div>
+                <div id="send-queue"></div>
             </div>
 
-            <!-- RECEIVER: Waiting and received files list -->
-            <div id="receiver-panel" class="panel hidden">
-                <div class="receiver-waiting-card" id="receiver-idle-card">
+            <!-- RECEIVER: Waiting -->
+            <div id="receiver-panel" class="hidden">
+                <div id="receiver-idle-card" style="text-align:center; padding:40px 20px; background:var(--card-bg); border-radius:18px; border:1px solid var(--card-border);">
                     <div style="font-size:48px;margin-bottom:12px;">📥</div>
-                    <p class="drop-title">Waiting for files...</p>
-                    <p class="drop-sub">The sender will choose files to send you.</p>
+                    <p style="font-weight:500;">Waiting for files...</p>
                 </div>
-                <div id="receive-queue" class="file-list"></div>
+                <div id="receive-queue"></div>
             </div>
         </main>
 
-        <!-- Incoming file modal (shown to receiver when sender sends a file) -->
+        <!-- Incoming file modal -->
         <div id="incoming-modal" class="modal hidden">
             <div class="modal-content">
-                <h3>Incoming File</h3>
-                <div class="file-info">
-                    <span class="file-icon" id="incoming-fileicon">📄</span>
-                    <span id="incoming-filename" class="filename">document.pdf</span>
-                    <span id="incoming-filesize" class="filesize">2.5 MB</span>
+                <h3 style="margin-top:0;margin-bottom:16px;">Incoming File</h3>
+                <div style="background:rgba(255,255,255,0.05); padding:16px; border-radius:12px; margin-bottom:20px;">
+                    <div id="incoming-filename" style="font-weight:600; word-break:break-all; margin-bottom:4px;">document.pdf</div>
+                    <div id="incoming-filesize" style="color:var(--text-muted); font-size:14px; font-family:'JetBrains Mono', monospace;">2.5 MB</div>
                 </div>
-                <div class="modal-actions">
-                    <button id="btn-decline" class="danger-btn">Decline</button>
-                    <button id="btn-accept" class="success-btn">Accept</button>
+                <div style="display:flex; gap:10px;">
+                    <button id="btn-decline" class="secondary-btn" style="flex:1;">Decline</button>
+                    <button id="btn-accept" class="primary-btn" style="flex:1;">Accept</button>
                 </div>
             </div>
         </div>
@@ -182,13 +156,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-    <!-- Config loads first -->
+    <!-- App Scripts -->
     <script src="/js/config.js"></script>
-    <!-- App logic -->
     <script src="/js/detect.js"></script>
     <script src="/js/qr.js"></script>
+    <script src="/js/preflight.js"></script>
+    <script src="/js/feedback.js"></script>
+    <script src="/js/wizard.js"></script>
+    <script src="/js/lobby.js"></script>
     <script src="/js/transfer.js"></script>
     <script src="/js/webrtc.js"></script>
+    <script src="/js/trust-panel.js"></script>
+    <script src="/js/orbit.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>
