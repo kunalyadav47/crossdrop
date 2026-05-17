@@ -62,10 +62,27 @@ window.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('crossdrop_tip_shown', 'true');
     });
 
-    // Register Service Worker
+    // Register Service Worker with forced auto-reload on update
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                        // SW updated, reload immediately to fetch fresh UI
+                        window.location.reload();
+                    }
+                });
+            });
+        }).catch(err => {
             console.log('SW Registration failed: ', err);
+        });
+
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
         });
     }
 });
