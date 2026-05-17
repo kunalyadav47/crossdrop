@@ -83,9 +83,7 @@
             <button class="back-btn">← Back</button>
             <h2>Receive Files</h2>
             <div id="receive-setup" class="setup-container">
-                <div id="qr-container">
-                    <img id="qr-image" style="width: 250px; height: 250px; background: white;" alt="Room Code QR" />
-                </div>
+                <div id="qr-container"></div>
                 <div class="room-code-display">
                     Code: <strong id="room-code">------</strong>
                 </div>
@@ -122,7 +120,7 @@
 
     <!-- CDNs for dependencies -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     
     <!-- Config loads first so BACKEND_URL is available to all scripts -->

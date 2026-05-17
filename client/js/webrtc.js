@@ -16,7 +16,7 @@ const WebRTC = {
         this.isSender = false;
         this.roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
         document.getElementById('room-code').textContent = this.roomId;
-        generateQR(this.roomId, document.getElementById('qr-image'));
+        generateQR(this.roomId, 'qr-container');
         
         socket.emit('join-room', this.roomId, window.myName);
         this.setupPeer();

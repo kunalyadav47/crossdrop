@@ -49,23 +49,29 @@ const QRScanner = {
     }
 };
 
-function generateQR(text, imgEl) {
+function generateQR(text, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    // Clear previous QR code if any
+    container.innerHTML = '';
+    
     if (typeof QRCode === 'undefined') {
         console.error("QRCode library failed to load");
+        container.textContent = "Error: QR library blocked by browser.";
         return;
     }
-    QRCode.toDataURL(text, {
-        width: 250,
-        margin: 2,
-        color: {
-            dark: "#000000",
-            light: "#ffffff"
-        }
-    }, function (error, url) {
-        if (error) {
-            console.error("QR Error", error);
-        } else {
-            imgEl.src = url;
-        }
-    });
+
+    try {
+        new QRCode(container, {
+            text: text,
+            width: 220,
+            height: 220,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    } catch (e) {
+        console.error("QR Generation failed", e);
+    }
 }
