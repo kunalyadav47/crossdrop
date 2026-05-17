@@ -23,16 +23,16 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-send').addEventListener('click', () => {
         showView('send');
         WebRTC.startSender();
-    });
-
-    document.getElementById('btn-receive').addEventListener('click', () => {
-        showView('receive');
-        WebRTC.startReceiver();
         QRScanner.start(document.getElementById('scanner-video'), (code) => {
             QRScanner.stop();
             document.getElementById('manual-code').value = code;
             WebRTC.joinRoom(code);
         });
+    });
+
+    document.getElementById('btn-receive').addEventListener('click', () => {
+        showView('receive');
+        WebRTC.startReceiver();
     });
 
     document.querySelectorAll('.back-btn').forEach(btn => {
@@ -46,7 +46,7 @@ window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('send-active').classList.add('hidden');
             document.getElementById('receive-setup').classList.remove('hidden');
             document.getElementById('receive-active').classList.add('hidden');
-            document.getElementById('receive-waiting').classList.add('hidden');
+            document.getElementById('send-waiting').classList.add('hidden');
         });
     });
 

@@ -1,4 +1,4 @@
-// BACKEND_URL is defined in app.js — do not redefine here
+// BACKEND_URL is defined in config.js
 const socket = io(BACKEND_URL, {
   transports: ['websocket'],
   upgrade: false
@@ -10,12 +10,10 @@ const WebRTC = {
     roomId: null,
     isSender: false,
     NUM_CHANNELS: 16,
-    
-    // State for signaling
     connected: false,
 
-    startSender() {
-        this.isSender = true;
+    startReceiver() {
+        this.isSender = false;
         this.roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
         document.getElementById('room-code').textContent = this.roomId;
         generateQR(this.roomId, document.getElementById('qr-canvas'));
@@ -24,15 +22,15 @@ const WebRTC = {
         this.setupPeer();
     },
 
-    startReceiver() {
-        this.isSender = false;
+    startSender() {
+        this.isSender = true;
         this.setupPeer();
     },
 
     joinRoom(code) {
         this.roomId = code;
-        document.getElementById('receive-waiting').classList.remove('hidden');
-        document.getElementById('receive-waiting').textContent = "Connecting...";
+        document.getElementById('send-waiting').classList.remove('hidden');
+        document.getElementById('send-waiting').textContent = "Connecting...";
         socket.emit('join-room', this.roomId, window.myName);
     },
 
@@ -47,8 +45,8 @@ const WebRTC = {
             }
         };
 
-        if (this.isSender) {
-            // Create data channels
+        // Receiver creates the room, so Receiver creates the data channels
+        if (!this.isSender) {
             for (let i = 0; i < this.NUM_CHANNELS; i++) {
                 const dc = this.peer.createDataChannel(`channel-${i}`, {
                     ordered: true
@@ -57,9 +55,17 @@ const WebRTC = {
                 this.dataChannels.push(dc);
             }
         } else {
+            // Sender receives the data channels
             this.peer.ondatachannel = (e) => {
                 this.setupDataChannel(e.channel);
                 this.dataChannels.push(e.channel);
+                
+                // Keep channels sorted by name so channel-0 is always control
+                this.dataChannels.sort((a, b) => {
+                    const aNum = parseInt(a.label.split('-')[1]);
+                    const bNum = parseInt(b.label.split('-')[1]);
+                    return aNum - bNum;
+                });
             };
         }
     },
@@ -69,9 +75,14 @@ const WebRTC = {
         dc.bufferedAmountLowThreshold = 64 * 1024 * 4; // 256KB threshold
         
         dc.onopen = () => {
-            if (this.dataChannels.every(c => c.readyState === 'open') && !this.connected) {
+            if (this.dataChannels.length === this.NUM_CHANNELS && this.dataChannels.every(c => c.readyState === 'open') && !this.connected) {
                 this.connected = true;
                 this.onConnected();
+                
+                // Exchange names over channel 0
+                if (this.dataChannels[0]) {
+                    this.dataChannels[0].send(JSON.stringify({ type: 'name', name: window.myName }));
+                }
             }
         };
         dc.onmessage = (e) => {
@@ -111,16 +122,16 @@ const WebRTC = {
 
 // Signaling
 socket.on('user-joined', async (id, deviceName) => {
-    if (WebRTC.isSender) {
-        document.getElementById('receiver-name').textContent = deviceName;
-        await WebRTC.makeOffer();
-    } else {
+    // Receiver is the room creator. When Sender joins, Receiver gets this event.
+    if (!WebRTC.isSender) {
         document.getElementById('sender-name').textContent = deviceName;
+        await WebRTC.makeOffer();
     }
 });
 
 socket.on('offer', async (id, offer) => {
-    if (!WebRTC.isSender) {
+    // Sender gets the offer from Receiver
+    if (WebRTC.isSender) {
         await WebRTC.peer.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await WebRTC.peer.createAnswer();
         await WebRTC.peer.setLocalDescription(answer);
@@ -129,7 +140,8 @@ socket.on('offer', async (id, offer) => {
 });
 
 socket.on('answer', async (id, answer) => {
-    if (WebRTC.isSender) {
+    // Receiver gets the answer from Sender
+    if (!WebRTC.isSender) {
         await WebRTC.peer.setRemoteDescription(new RTCSessionDescription(answer));
     }
 });

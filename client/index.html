@@ -47,14 +47,17 @@
             <button class="back-btn">← Back</button>
             <h2>Send Files</h2>
             <div id="send-setup" class="setup-container">
-                <div id="qr-container">
-                    <canvas id="qr-canvas"></canvas>
+                <div class="scanner-container">
+                    <video id="scanner-video" playsinline></video>
+                    <div class="scanner-overlay" id="scanner-overlay"></div>
                 </div>
-                <div class="room-code-display">
-                    Code: <strong id="room-code">------</strong>
+                <p>Scan the QR code from the receiving device.</p>
+                <div class="manual-entry">
+                    <span>Or enter code:</span>
+                    <input type="text" id="manual-code" maxlength="6" placeholder="123456">
+                    <button id="join-btn">Connect</button>
                 </div>
-                <p>Scan this QR code on the receiving device or enter the code manually.</p>
-                <div class="waiting-text">Waiting for receiver...</div>
+                <div class="waiting-text hidden" id="send-waiting">Connecting...</div>
             </div>
 
             <div id="send-active" class="active-container hidden">
@@ -80,17 +83,14 @@
             <button class="back-btn">← Back</button>
             <h2>Receive Files</h2>
             <div id="receive-setup" class="setup-container">
-                <div class="scanner-container">
-                    <video id="scanner-video" playsinline></video>
-                    <div class="scanner-overlay"></div>
+                <div id="qr-container">
+                    <canvas id="qr-canvas"></canvas>
                 </div>
-                <p>Scan the QR code from the sender device.</p>
-                <div class="manual-entry">
-                    <span>Or enter code:</span>
-                    <input type="text" id="manual-code" maxlength="6" placeholder="123456">
-                    <button id="join-btn">Join</button>
+                <div class="room-code-display">
+                    Code: <strong id="room-code">------</strong>
                 </div>
-                <div class="waiting-text hidden" id="receive-waiting">Connecting...</div>
+                <p>Scan this QR code on the sending device or give them the code.</p>
+                <div class="waiting-text">Waiting for sender...</div>
             </div>
 
             <div id="receive-active" class="active-container hidden">
