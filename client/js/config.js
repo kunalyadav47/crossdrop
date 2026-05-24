@@ -1,2 +1,3 @@
 // Central config — loaded first before all other scripts
-const BACKEND_URL = 'https://crossdrop-yjib.onrender.com';
+// Prefer the current origin so static builds and deployments use the correct backend.
+const BACKEND_URL = window.location.origin;
