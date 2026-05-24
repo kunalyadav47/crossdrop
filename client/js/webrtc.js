@@ -244,11 +244,44 @@ const WebRTC = {
                 const wait = this.isSender
                     ? document.getElementById('send-waiting')
                     : document.getElementById('receive-waiting');
-                // Fall back to a less strict mode instead of outright rejecting — improves UX
                 console.warn('WebRTC.verifyAndFinalize: Strict LAN required but pure LAN not detected. Falling back to wifi mode.');
                 if (wait) wait.textContent = "⚠️ Internet path detected in Strict LAN mode. Falling back to 'WiFi Router' mode…";
-                // Flip to wifi mode and continue verification (do not close peer)
+
+                // If we've already retried once, don't loop — give up and show error
+                if (this._relaxedOnce) {
+                    if (wait) wait.textContent = "❌ No direct route found. Try changing Network mode in ⚙ Advanced.";
+                    if (window.Feedback) window.Feedback.play('error');
+                    this.peer.close(); this.peer = null; this.dataChannels = [];
+                    return;
+                }
+
+                // Mark we've relaxed once to avoid infinite retries
+                this._relaxedOnce = true;
+                // Switch to wifi mode and restart negotiation by tearing down and re-creating the peer
                 this.networkMode = 'wifi';
+                console.log('WebRTC.verifyAndFinalize: relaxing networkMode -> wifi and retrying negotiation');
+                if (wait) wait.textContent = "Retrying connection with relaxed network rules…";
+
+                // Close current peer and clear data channels
+                if (this.peer) { try { this.peer.close(); } catch(e){} }
+                this.peer = null; this.dataChannels = [];
+
+                // Re-init peer and restart offer/answer depending on role
+                setTimeout(() => {
+                    try {
+                        this.setupPeer();
+                        if (this.isSender) {
+                            // Re-join and create a fresh offer
+                            if (this.roomId) socket.emit('join-room', this.roomId, window.myName);
+                            this.makeOffer();
+                        } else {
+                            // Receiver: join room to ensure signalling is ready
+                            if (this.roomId) socket.emit('join-room', this.roomId, window.myName);
+                        }
+                    } catch (e) { console.warn('Relax retry failed', e); }
+                }, 600);
+
+                return;
             }
 
             if (this.networkMode === 'wifi' && networkType === 'cellular') {
