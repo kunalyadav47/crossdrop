@@ -16,6 +16,7 @@ window.Lobby = {
     pendingPair: null,  // socketId we sent a request to
 
     init() {
+        console.log('LOBBY JS loaded (build: 2026-05-25)');
         // Auto-register on connect and reconnect
         socket.on('connect', () => {
             socket.emit('register-lobby', window.myName || '📡 Device');
@@ -59,6 +60,7 @@ window.Lobby = {
 
         // Our request was accepted — server gives us the room code → join it
         socket.on('pair-accepted', (roomId) => {
+            console.log('socket event: pair-accepted ->', roomId);
             try {
                 this.pendingPair = null;
                 this.hidePairSending();

@@ -57,6 +57,7 @@ const WebRTC = {
     },
 
     joinRoom(code) {
+        console.log('WebRTC.joinRoom called with code:', code);
         this.isSender = true;
         this.roomId = code.trim().toUpperCase();
 
