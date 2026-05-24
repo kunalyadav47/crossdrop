@@ -44,7 +44,5 @@ async function measureBandwidth() {
 // ─── DeviceDetect namespace (fixes "DeviceDetect is not defined") ─────────────
 window.DeviceDetect = {
     generateName() { return generateDeviceName(); },
-    getType() { return detectDeviceType(); },
-    // Measure bandwidth in MB/s by fetching the server speedtest endpoint
-    measureBandwidth: measureBandwidth
+    getType() { return detectDeviceType(); }
 };

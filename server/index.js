@@ -12,13 +12,6 @@ const io     = new Server(server, { cors: { origin: '*', methods: ['GET','POST']
 app.use(cors());
 app.use(express.json());
 
-// Serve a dynamic config so the client always talks to the correct backend origin
-app.get('/js/config.js', (req, res) => {
-    const origin = req.protocol + '://' + req.get('host');
-    res.type('application/javascript');
-    res.send(`// Dynamically generated config\nconst BACKEND_URL = '${origin}';`);
-});
-
 // Serve the frontend client files automatically
 app.use(express.static(path.join(__dirname, '../client')));
 
