@@ -81,6 +81,7 @@ const WebRTC = {
     },
 
     setupPeer() {
+        console.log('WebRTC.setupPeer: creating RTCPeerConnection');
         this.peer = new RTCPeerConnection({
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -121,6 +122,7 @@ const WebRTC = {
 
         this.peer.oniceconnectionstatechange = () => {
             const state = this.peer ? this.peer.iceConnectionState : 'closed';
+            console.log('WebRTC.oniceconnectionstatechange ->', state);
             const el = this.isSender
                 ? document.getElementById('send-waiting')
                 : document.getElementById('receive-waiting');
@@ -145,12 +147,14 @@ const WebRTC = {
             const sorted = [];
             for (let i = 0; i < this.NUM_CHANNELS; i++) {
                 const dc = this.peer.createDataChannel(`ch-${i}`, { ordered: false, maxRetransmits: 0 });
+                console.log('WebRTC.setupPeer: created datachannel ch-' + i);
                 this.setupDataChannel(dc, i);
                 sorted.push(dc);
             }
             this.dataChannels = sorted;
         } else {
             this.peer.ondatachannel = (e) => {
+                console.log('WebRTC.ondatachannel ->', e.channel.label);
                 const idx = parseInt(e.channel.label.split('-')[1], 10) || this.dataChannels.length;
                 this.setupDataChannel(e.channel, idx);
                 this.dataChannels[idx] = e.channel;
@@ -193,6 +197,7 @@ const WebRTC = {
     },
 
     async verifyAndFinalize() {
+        console.log('WebRTC.verifyAndFinalize: enter, connected=', this.connected);
         if (this.connected || !this.peer) return;
 
         const iceState = this.peer.iceConnectionState;
@@ -201,12 +206,15 @@ const WebRTC = {
         const channelsReady = validChannels.length === this.NUM_CHANNELS
                            && validChannels.every(c => c.readyState === 'open');
 
+        console.log('WebRTC.verifyAndFinalize: iceState=', iceState, 'validChannels=', validChannels.length, 'channelsReady=', channelsReady);
+
         if (!iceReady || !channelsReady) return;
 
         clearTimeout(this.safetyAbortTimer);
 
         try {
             const stats = await this.peer.getStats();
+                console.log('WebRTC.verifyAndFinalize: got stats, entries=', stats.size || '(collection)');
             let localType = '', remoteType = '', localIp = '', remoteIp = '', networkType = 'unknown';
 
             stats.forEach(report => {
@@ -250,6 +258,7 @@ const WebRTC = {
 
             this.connected = true;
             if (window.Feedback) window.Feedback.play('paired');
+            console.log('WebRTC.verifyAndFinalize: connection finalized, calling onConnected, peerName=', this._peerName, 'isSender=', this.isSender);
             this.onConnected(this._peerName);
             if (window.TrustPanel) window.TrustPanel.start(this.peer);
 
@@ -259,6 +268,7 @@ const WebRTC = {
             this.connectionType = 'unknown';
             this.connected = true;
             if (window.Feedback) window.Feedback.play('paired');
+            console.log('WebRTC.verifyAndFinalize: verification failed but falling back to connected=true; calling onConnected');
             this.onConnected(this._peerName);
             if (window.TrustPanel) window.TrustPanel.start(this.peer);
         }
@@ -279,6 +289,7 @@ const WebRTC = {
     },
 
     onConnected(peerName) {
+        console.log('WebRTC.onConnected ->', peerName, 'isSender=', this.isSender, 'connectionType=', this.connectionType);
         if (window.FileTransfer) window.FileTransfer.init();
         window.location.hash = ''; // clear hash after connect
 
@@ -302,7 +313,7 @@ const WebRTC = {
             document.getElementById('sender-panel').classList.add('hidden');
         }
 
-        showView('connected');
+        try { showView('connected'); } catch (e) { console.warn('showView failed in onConnected', e); }
     },
 
     disconnect() {
