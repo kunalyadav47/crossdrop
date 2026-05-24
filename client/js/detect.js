@@ -46,3 +46,6 @@ window.DeviceDetect = {
     generateName() { return generateDeviceName(); },
     getType() { return detectDeviceType(); }
 };
+
+// Expose bandwidth measurement for other modules
+window.DeviceDetect.measureBandwidth = measureBandwidth;

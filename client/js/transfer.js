@@ -54,7 +54,8 @@ window.FileTransfer = {
             }
         });
 
-        document.getElementById('folder-input')?.addEventListener('change', e => {
+        const _folderInput = document.getElementById('folder-input');
+        if (_folderInput) _folderInput.addEventListener('change', e => {
             if (e.target.files.length) this.queueFiles(e.target.files);
             e.target.value = '';
         });
@@ -215,7 +216,8 @@ window.FileTransfer = {
         el.textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
     },
     hideSpeedUI() {
-        document.getElementById('speed-bar-wrap')?.classList.add('hidden');
+        const _wrap = document.getElementById('speed-bar-wrap');
+        if (_wrap) _wrap.classList.add('hidden');
         const t = document.getElementById('transfer-time-label');
         if (t) t.textContent = '00:00';
     },
@@ -271,8 +273,8 @@ window.FileTransfer = {
         };
 
         this.sendControl(meta);
-        window.Orbit?.start();
-        window.Feedback?.play('start');
+            if (window.Orbit) { window.Orbit.start(); }
+            if (window.Feedback) { window.Feedback.play('start'); }
 
         return new Promise(resolve => {
             this.onAccept = async (resumeChunks = []) => {
@@ -306,8 +308,8 @@ window.FileTransfer = {
                 this.onDone = () => {
                     clearInterval(speedInt);
                     this.logHistory(item.file.name, item.file.size, 'send');
-                    window.Orbit?.complete();
-                    window.Feedback?.play('complete');
+                        if (window.Orbit) { window.Orbit.complete(); }
+                        if (window.Feedback) { window.Feedback.play('complete'); }
                     const bar = document.getElementById(`prog-${item.id}`);
                     const sizeEl = document.getElementById(`size-${item.id}`);
                     if (bar) { bar.style.width = '100%'; bar.classList.add('prog-done'); }
@@ -327,7 +329,7 @@ window.FileTransfer = {
             this.onDecline = () => {
                 const sizeEl = document.getElementById(`size-${item.id}`);
                 if (sizeEl) sizeEl.textContent = '❌ Declined';
-                window.Feedback?.play('error');
+                if (window.Feedback) window.Feedback.play('error');
                 resolve();
             };
         });
@@ -392,13 +394,13 @@ window.FileTransfer = {
                 if (iconEl) iconEl.textContent = iconMatch;
                 
                 this.addFileToUI({ name: msg.filename, size: msg.originalSize }, msg.id, 'receive-queue');
-                window.Feedback?.play('start');
+                if (window.Feedback) window.Feedback.play('start');
 
-            } else if (msg.type === 'accept')  { this.onAccept?.(msg.resumeChunks || []); }
-              else if (msg.type === 'decline') { this.onDecline?.(); }
-              else if (msg.type === 'eof')     { this.checkEof(msg.id); }
-              else if (msg.type === 'nack')    { this.onNack?.(msg.missing); }
-              else if (msg.type === 'done')    { this.onDone?.(); }
+                        } else if (msg.type === 'accept')  { if (this.onAccept) this.onAccept(msg.resumeChunks || []); }
+                            else if (msg.type === 'decline') { if (this.onDecline) this.onDecline(); }
+                            else if (msg.type === 'eof')     { this.checkEof(msg.id); }
+                            else if (msg.type === 'nack')    { if (this.onNack) this.onNack(msg.missing); }
+                            else if (msg.type === 'done')    { if (this.onDone) this.onDone(); }
 
         } else if (data instanceof ArrayBuffer) {
             if (!this.startTime) this.startTime = performance.now();
@@ -447,7 +449,7 @@ window.FileTransfer = {
 
     acceptCurrentFile() {
         document.getElementById('incoming-modal').classList.add('hidden');
-        window.Orbit?.start();
+        if (window.Orbit) window.Orbit.start();
         // Resume logic: if we already have chunks for this exact file id (e.g. reconnection)
         const resumeChunks = Array.from(this.receivedChunksSet);
         this.sendControl({ type: 'accept', resumeChunks });
@@ -507,9 +509,9 @@ window.FileTransfer = {
         }
 
         this.logHistory(this.incomingMeta.filename, this.incomingMeta.filesize, 'receive');
-        window.Orbit?.complete();
-        window.Feedback?.play('complete');
-        window.showToast?.(\`✅ \${this.incomingMeta.filename} saved\`);
+            if (window.Orbit) { window.Orbit.complete(); }
+            if (window.Feedback) { window.Feedback.play('complete'); }
+            if (window.showToast) { window.showToast(`✅ ${this.incomingMeta.filename} saved`); }
         
         // Add celebration particle
         const particle = document.createElement('div');
@@ -534,7 +536,7 @@ window.FileTransfer = {
         const h = {
             filename, size, direction,
             timestamp: Date.now(),
-            speed: document.getElementById('transfer-speed-label')?.textContent.split(' ')[1] || '0.0'
+            speed: (function(){ const el = document.getElementById('transfer-speed-label'); return el && el.textContent ? (el.textContent.split(' ')[1] || '0.0') : '0.0'; })()
         };
         try {
             let history = JSON.parse(localStorage.getItem('crossdrop_history') || '[]');
