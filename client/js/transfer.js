@@ -359,7 +359,7 @@ window.FileTransfer = {
 
                 if (idx % 10 === 0 || idx === totalChunks - 1) {
                     const bar = document.getElementById(`prog-${fileId}`);
-                    if (bar) bar.style.width = \`\${((totalChunks - indices.length + nextIndex)/totalChunks)*100}%\`;
+                    if (bar) bar.style.width = `${((totalChunks - indices.length + nextIndex)/totalChunks)*100}%`;
                 }
             }
         };
@@ -384,7 +384,7 @@ window.FileTransfer = {
                 this.startTime = 0;
                 
                 document.getElementById('incoming-filename').textContent = msg.filename;
-                document.getElementById('incoming-filesize').textContent = \`\${(msg.originalSize / 1048576).toFixed(2)} MB\`;
+                document.getElementById('incoming-filesize').textContent = `${(msg.originalSize / 1048576).toFixed(2)} MB`;
                 const senderEl = document.getElementById('incoming-sender');
                 if (senderEl) senderEl.textContent = 'from ' + (msg.senderName || 'Unknown');
                 document.getElementById('incoming-modal').classList.remove('hidden');
@@ -425,8 +425,8 @@ window.FileTransfer = {
             if (this.incomingMeta) {
                 const total = this.incomingMeta.totalChunks;
                 if (this.receivedChunksSet.size % 10 === 0 || this.receivedChunksSet.size === total) {
-                    const bar = document.getElementById(\`prog-\${this.incomingMeta.id}\`);
-                    if (bar) bar.style.width = \`\${(this.receivedChunksSet.size / total) * 100}%\`;
+                    const bar = document.getElementById(`prog-${this.incomingMeta.id}`);
+                    if (bar) bar.style.width = `${(this.receivedChunksSet.size / total) * 100}%`;
                 }
             }
         }
@@ -464,8 +464,8 @@ window.FileTransfer = {
         if (!this.incomingMeta) return;
         this.hideSpeedUI();
 
-        const bar = document.getElementById(\`prog-\${this.incomingMeta.id}\`);
-        const sizeEl = document.getElementById(\`size-\${this.incomingMeta.id}\`);
+        const bar = document.getElementById(`prog-${this.incomingMeta.id}`);
+        const sizeEl = document.getElementById(`size-${this.incomingMeta.id}`);
         if (bar) { bar.style.width = '100%'; bar.classList.add('prog-done'); }
 
         // Assemble Blob (zero-copy views)
