@@ -211,8 +211,9 @@ const WebRTC = {
         const iceState = this.peer.iceConnectionState;
         const iceReady = iceState === 'connected' || iceState === 'completed';
         const validChannels = this.dataChannels.filter(Boolean);
-        const channelsReady = validChannels.length === this.NUM_CHANNELS
-                           && validChannels.every(c => c.readyState === 'open');
+        const minChannels = Math.min(4, this.NUM_CHANNELS);
+        const channelsReady = validChannels.length >= minChannels
+                   && validChannels.every(c => c.readyState === 'open');
 
         console.log('WebRTC.verifyAndFinalize: iceState=', iceState, 'validChannels=', validChannels.length, 'channelsReady=', channelsReady);
 
@@ -220,8 +221,9 @@ const WebRTC = {
 
         clearTimeout(this.safetyAbortTimer);
 
-        try {
+            try {
             const stats = await this.peer.getStats();
+                console.log('WebRTC.verifyAndFinalize: stats fetched');
                 console.log('WebRTC.verifyAndFinalize: got stats, entries=', stats.size || '(collection)');
             let localType = '', remoteType = '', localIp = '', remoteIp = '', networkType = 'unknown';
 
@@ -405,8 +407,10 @@ socket.on('offer', async (id, offer) => {
         const wait = document.getElementById('receive-waiting');
         if (wait) wait.textContent = "Offer received, connecting…";
         try {
+            console.log('socket: offer received from', id);
             await WebRTC.peer.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await WebRTC.peer.createAnswer();
+            console.log('socket: created answer, setting local description');
             await WebRTC.peer.setLocalDescription(answer);
             socket.emit('answer', WebRTC.roomId, answer);
         } catch (e) {
@@ -421,7 +425,9 @@ socket.on('answer', async (id, answer) => {
         const wait = document.getElementById('send-waiting');
         if (wait) wait.textContent = 'Answer received, finalising ICE…';
         try {
+            console.log('socket: answer received from', id);
             await WebRTC.peer.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('socket: remote description set from answer');
         } catch (e) {
             console.error('Set answer failed', e);
             if (wait) wait.textContent = '❌ Set answer failed: ' + e.message;
