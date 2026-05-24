@@ -59,14 +59,27 @@ window.Lobby = {
 
         // Our request was accepted — server gives us the room code → join it
         socket.on('pair-accepted', (roomId) => {
-            this.pendingPair = null;
-            this.hidePairSending();
-            window.showToast?.('✅ Accepted! Connecting…');
-            // Navigate to send view and join room
-            showView('send');
-            const waiting = document.getElementById('send-waiting');
-            if (waiting) { waiting.classList.remove('hidden'); waiting.textContent = 'Connecting via radar…'; }
-            WebRTC.joinRoom(roomId);
+            try {
+                this.pendingPair = null;
+                this.hidePairSending();
+                window.showToast?.('✅ Accepted! Connecting…');
+
+                // Navigate to send view and join room (defensive: ensure UI updates even on errors)
+                try { showView('send'); } catch (e) { console.warn('showView failed', e); }
+                const waiting = document.getElementById('send-waiting');
+                if (waiting) { waiting.classList.remove('hidden'); waiting.textContent = 'Connecting via radar…'; }
+
+                // Attempt to join room; surface an error toast if it throws
+                try {
+                    WebRTC.joinRoom(roomId);
+                } catch (e) {
+                    console.error('WebRTC.joinRoom failed', e);
+                    window.showToast?.('❌ Connection failed — check console');
+                }
+            } catch (err) {
+                console.error('pair-accepted handler error', err);
+                window.showToast?.('❌ Unexpected error handling pair acceptance');
+            }
         });
 
         // Our request was declined
