@@ -3,171 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CrossDrop - AirDrop for everyone</title>
+    <title>CrossDrop</title>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0A0A0A">
+    <meta name="theme-color" content="#0C0C0F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="/css/app.css">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="app">
-        <!-- HOME VIEW -->
-        <main id="view-home" class="view active">
-            <h1>CrossDrop</h1>
-            <p class="tagline">Pure-WiFi file beam</p>
 
-            <div id="preflight-pill" class="preflight-pill pill-wait" tabindex="0" aria-label="Network Status">
-                <span class="pill-icon">⚪</span> <span id="preflight-text">Checking...</span>
+<div id="toast"></div>
+
+<div id="install-banner" class="install-banner hidden">
+    <span>Add CrossDrop to your home screen</span>
+    <div class="install-actions">
+        <button id="btn-install-dismiss" class="install-dismiss">Later</button>
+        <button id="btn-install-accept" class="install-accept">Install</button>
+    </div>
+</div>
+
+<div id="bandwidth-banner" class="bw-banner hidden">
+    <span>💡 Switch hotspot to <strong>5GHz</strong> for 2× speed</span>
+    <button id="banner-dismiss">✕</button>
+</div>
+
+<div id="app">
+
+<!-- ████████████████████ HOME ████████████████████ -->
+<main id="view-home" class="view active">
+
+    <header class="home-header">
+        <div class="wordmark">Cross<span>Drop</span></div>
+        <div class="status-chip">
+            <span class="status-dot offline"></span>
+            <span id="status-text">connecting</span>
+        </div>
+    </header>
+
+    <div id="preflight-pill" class="preflight-pill pill-wait">
+        <span id="preflight-text">Checking network…</span>
+    </div>
+
+    <!-- Radar -->
+    <div id="radar-section" class="hidden">
+        <div class="radar-heading">
+            <span class="radar-live-dot"></span>
+            <span id="radar-count-label">devices nearby</span>
+        </div>
+        <div class="radar-wrap">
+            <canvas id="radar-canvas" width="280" height="280"></canvas>
+            <div id="radar-sending-overlay" class="radar-overlay hidden">
+                <div class="radar-spinner"></div>
+                <p id="radar-sending-label">Requesting…</p>
+                <button onclick="Lobby.pendingPair=null;Lobby.hidePairSending();" class="radar-cancel">Cancel</button>
             </div>
+        </div>
+    </div>
 
-            <div class="beam-container">
-                <div class="pulse-ring"></div>
-                <div class="pulse-ring"></div>
-                <div class="pulse-ring"></div>
-                <div class="beam-radial">
-                    📡
-                    <div class="beam-text">BEAM</div>
-                </div>
-            </div>
-
-            <div class="action-buttons">
-                <button id="btn-send" class="action-btn" aria-label="Send Files">
-                    <span class="icon">📤</span>
-                    Send
-                </button>
-                <button id="btn-receive" class="action-btn" aria-label="Receive Files">
-                    <span class="icon">📥</span>
-                    Receive
-                </button>
-            </div>
-
-            <div class="home-trust-banner">
-                <div><span>🛡️ Cellular bytes used:</span> <span class="cell-zero">0 KB</span></div>
-                <div><span>📡 You are:</span> <strong id="my-device-name">...</strong></div>
-            </div>
-
-            <details class="advanced">
-                <summary>⚙ Advanced ⌄</summary>
-                <div class="adv-content">
-                    <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:14px; margin-bottom:12px;">
-                        <span>Mute Sounds</span>
-                        <input type="checkbox" id="mute-toggle" style="accent-color: var(--accent-lime); width: 16px; height: 16px;">
-                    </label>
-                    
-                    <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Network Route:</div>
-                    <label style="display:block; margin-bottom:8px; font-size:14px; cursor:pointer;"><input type="radio" name="net_mode" value="strict" checked> 🛡️ Strict LAN</label>
-                    <label style="display:block; margin-bottom:8px; font-size:14px; cursor:pointer;"><input type="radio" name="net_mode" value="wifi"> 🌐 WiFi Router</label>
-                    <label style="display:block; font-size:14px; cursor:pointer;"><input type="radio" name="net_mode" value="any"> 📶 Any (Uses Data)</label>
-                </div>
-            </details>
-        </main>
-
-        <!-- SEND VIEW -->
-        <main id="view-send" class="view">
-            <button class="back-btn">← Back</button>
-            <h2>Send Files</h2>
-            <div id="send-setup" class="setup-container">
-                <div class="scanner-container">
-                    <video id="scanner-video" playsinline muted></video>
-                </div>
-                <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">Scan the QR code shown on the receiver's screen.</p>
-                <input type="text" id="manual-code" maxlength="6" placeholder="Or type code here" autocomplete="off">
-                <button id="join-btn" class="join-btn">Connect</button>
-                <div class="waiting-text hidden" id="send-waiting"></div>
-            </div>
-        </main>
-
-        <!-- RECEIVE VIEW -->
-        <main id="view-receive" class="view">
-            <button class="back-btn">← Back</button>
-            <h2>Receive Files</h2>
-            <div id="receive-setup" class="setup-container">
-                <!-- Lobby row goes here dynamically via lobby.js -->
-                
-                <div id="qr-container"></div>
-                <div class="room-code-display" id="room-code">------</div>
-                <p style="color:var(--text-muted);font-size:14px;">Share this code or let the sender scan the QR.</p>
-                <div class="waiting-text">Waiting for sender...</div>
-                <div class="waiting-text hidden" id="receive-waiting"></div>
-            </div>
-        </main>
-
-        <!-- CONNECTED DASHBOARD -->
-        <main id="view-connected" class="view">
-            <button id="btn-disconnect" class="back-btn" title="Disconnect">✕ Disconnect</button>
-            
-            <canvas id="orbit-canvas" class="hidden" width="320" height="120"></canvas>
-
-            <div id="trust-panel" class="trust-panel hidden">
-                <div class="tp-header"><span class="icon">🛡️</span> PURE LAN VERIFIED</div>
-                <div class="tp-row"><span>Your route:</span> <span id="tp-route-loc">-</span></div>
-                <div class="tp-row"><span>Peer route:</span> <span id="tp-route-rem">-</span></div>
-                <div class="tp-row"><span>Path:</span> <span id="tp-path">-</span></div>
-                <div class="tp-row"><span>RTT:</span> <span id="tp-rtt">-</span></div>
-                <div class="tp-row"><span>Channels:</span> <span id="tp-channels"></span></div>
-                <div class="tp-divider"></div>
-                <div class="tp-row"><span>Cellular:</span> <span id="tp-cell" style="color:var(--accent-lime); font-weight:bold;">0 KB ✓</span></div>
-                <div class="tp-row"><span>WiFi sent:</span> <span id="tp-sent">0.00 MB</span></div>
-                <div class="tp-row"><span>WiFi recv:</span> <span id="tp-recv">0.00 MB</span></div>
-                <div class="tp-speed-row">
-                    <span id="transfer-speed-label">⚡ 0 MB/s</span>
-                    <span id="transfer-time-label">⏱ 00:00</span>
-                </div>
-            </div>
-
-            <!-- SENDER: Drop zone -->
-            <div id="sender-panel" class="hidden">
-                <div id="drop-zone" class="drop-zone">
-                    <input type="file" id="file-input" multiple hidden>
-                    <div style="font-size:32px; margin-bottom:8px;">📁</div>
-                    <p style="font-size:16px; font-weight:500;">Tap to select files</p>
-                </div>
-                <div id="send-queue"></div>
-            </div>
-
-            <!-- RECEIVER: Waiting -->
-            <div id="receiver-panel" class="hidden">
-                <div id="receiver-idle-card" style="text-align:center; padding:40px 20px; background:var(--card-bg); border-radius:18px; border:1px solid var(--card-border);">
-                    <div style="font-size:48px;margin-bottom:12px;">📥</div>
-                    <p style="font-weight:500;">Waiting for files...</p>
-                </div>
-                <div id="receive-queue"></div>
-            </div>
-        </main>
-
-        <!-- Incoming file modal -->
-        <div id="incoming-modal" class="modal hidden">
-            <div class="modal-content">
-                <h3 style="margin-top:0;margin-bottom:16px;">Incoming File</h3>
-                <div style="background:rgba(255,255,255,0.05); padding:16px; border-radius:12px; margin-bottom:20px;">
-                    <div id="incoming-filename" style="font-weight:600; word-break:break-all; margin-bottom:4px;">document.pdf</div>
-                    <div id="incoming-filesize" style="color:var(--text-muted); font-size:14px; font-family:'JetBrains Mono', monospace;">2.5 MB</div>
-                </div>
-                <div style="display:flex; gap:10px;">
-                    <button id="btn-decline" class="secondary-btn" style="flex:1;">Decline</button>
-                    <button id="btn-accept" class="primary-btn" style="flex:1;">Accept</button>
+    <!-- Hero orb (shown when no radar) -->
+    <div id="hero-orb" class="hero-orb-wrap">
+        <div class="orb-outer">
+            <div class="orb-mid">
+                <div class="orb-core">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <path d="M14 4 L14 18 M14 4 L8 10 M14 4 L20 10" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M4 20 L4 24 L24 24 L24 20" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- CDNs -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <div id="radar-empty-hint" class="empty-hint hidden">
+        Both devices must be on the same WiFi hotspot
+    </div>
 
-    <!-- App Scripts -->
-    <script src="/js/config.js"></script>
-    <script src="/js/detect.js"></script>
-    <script src="/js/qr.js"></script>
-    <script src="/js/preflight.js"></script>
-    <script src="/js/feedback.js"></script>
-    <script src="/js/wizard.js"></script>
-    <script src="/js/lobby.js"></script>
-    <script src="/js/transfer.js"></script>
-    <script src="/js/webrtc.js"></script>
-    <script src="/js/trust-panel.js"></script>
-    <script src="/js/orbit.js"></script>
-    <script src="/js/app.js"></script>
+    <div class="cta-grid">
+        <button id="btn-send" class="cta-send">
+            <div class="cta-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                </svg>
+            </div>
+            <span class="cta-label">Send</span>
+            <span class="cta-sub">scan or tap device</span>
+        </button>
+        <button id="btn-receive" class="cta-recv">
+            <div class="cta-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                </svg>
+            </div>
+            <span class="cta-label">Receive</span>
+            <span class="cta-sub">show your code</span>
+        </button>
+    </div>
+
+    <div class="home-meta-card">
+        <div class="meta-row">
+            <span class="meta-key">You are</span>
+            <span id="my-device-name" class="meta-val mono">…</span>
+        </div>
+        <div class="meta-row">
+            <span class="meta-key">Cellular used</span>
+            <span class="meta-val" style="color:#4ADE80;">0 KB ✓</span>
+        </div>
+    </div>
+
+    <details class="settings-drawer">
+        <summary>Settings</summary>
+        <div class="drawer-body">
+            <label class="setting-row">
+                <span>Mute sounds</span>
+                <input type="checkbox" id="mute-toggle">
+            </label>
+            <div class="setting-divider"></div>
+            <div class="setting-label">Network mode</div>
+            <label class="setting-radio"><input type="radio" name="net_mode" value="strict" checked> 🛡 Strict LAN <small>safest</small></label>
+            <label class="setting-radio"><input type="radio" name="net_mode" value="wifi"> 🌐 WiFi Router <small>same router</small></label>
+            <label class="setting-radio"><input type="radio" name="net_mode" value="any"> 📶 Any <small>uses data if needed</small></label>
+            <div class="setting-divider"></div>
+            <details class="history-details">
+                <summary>Recent transfers</summary>
+                <div id="history-content" class="history-list"></div>
+            </details>
+        </div>
+    </details>
+
+</main>
+
+<!-- ████████████████████ SEND ████████████████████ -->
+<main id="view-send" class="view">
+    <div class="view-nav">
+        <button class="back-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="view-title">Send</span>
+        <span></span>
+    </div>
+
+    <div class="scanner-frame">
+        <video id="scanner-video" playsinline muted autoplay></video>
+        <div class="scanner-corners">
+            <span class="sc sc-tl"></span><span class="sc sc-tr"></span>
+            <span class="sc sc-bl"></span><span class="sc sc-br"></span>
+        </div>
+        <div class="scanner-line"></div>
+    </div>
+
+    <p class="view-hint">Point camera at receiver's QR code</p>
+
+    <div class="divider-row"><span>or type code</span></div>
+
+    <div class="code-input-row">
+        <input type="text" id="manual-code" maxlength="6" placeholder="A3X9K2" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button id="join-btn" class="join-btn">→</button>
+    </div>
+
+    <div id="send-waiting" class="status-steps hidden">
+        <div class="step-row" id="step-1"><span class="step-dot"></span><span>Joining room…</span></div>
+        <div class="step-row" id="step-2"><span class="step-dot"></span><span>Creating offer…</span></div>
+        <div class="step-row" id="step-3"><span class="step-dot"></span><span>ICE negotiation…</span></div>
+        <div class="step-row" id="step-4"><span class="step-dot"></span><span>Opening channels…</span></div>
+    </div>
+</main>
+
+<!-- ████████████████████ RECEIVE ████████████████████ -->
+<main id="view-receive" class="view">
+    <div class="view-nav">
+        <button class="back-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="view-title">Receive</span>
+        <span></span>
+    </div>
+
+    <div id="qr-container" class="qr-box"></div>
+
+    <div class="code-display-row">
+        <span id="room-code" class="room-code-text">———</span>
+        <button id="btn-share-code" class="share-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share
+        </button>
+    </div>
+
+    <p class="view-hint">Let the sender scan this or type the code above</p>
+
+    <!-- Nearby cards in receive view -->
+    <div id="nearby-section" class="nearby-section hidden">
+        <div class="nearby-header">
+            <span class="radar-live-dot"></span>
+            <span>Nearby — tap to connect</span>
+        </div>
+        <div id="nearby-cards" class="nearby-cards"></div>
+    </div>
+
+    <div id="receive-waiting" class="waiting-bar hidden"></div>
+</main>
+
+<!-- ████████████████████ CONNECTED ████████████████████ -->
+<main id="view-connected" class="view">
+
+    <div class="peer-strip">
+        <div class="peer-av" id="peer-avatar">📱</div>
+        <div class="peer-info">
+            <div id="peer-name" class="peer-name">Unknown</div>
+            <span id="conn-type-badge" class="conn-badge badge-lan">🛡 Pure LAN</span>
+        </div>
+        <button id="btn-disconnect" class="end-btn">End</button>
+    </div>
+
+    <!-- Speed + time -->
+    <div id="speed-bar-wrap" class="speed-card hidden">
+        <div class="speed-top">
+            <span id="transfer-speed-label" class="speed-num">0<span class="speed-unit">MB/s</span></span>
+            <span id="transfer-time-label" class="speed-timer mono">00:00</span>
+        </div>
+        <div class="speed-track">
+            <div id="speed-bar-fill" class="speed-fill"></div>
+        </div>
+        <div id="speed-peak" class="speed-peak">▲ peak — MB/s</div>
+    </div>
+
+    <!-- Orbit canvas -->
+    <canvas id="orbit-canvas" class="orbit-canvas hidden" width="320" height="80"></canvas>
+
+    <!-- Trust / connection details -->
+    <details class="trust-drawer" open>
+        <summary>Connection details</summary>
+        <div class="trust-grid">
+            <span class="tg-key">Path</span>       <span id="tp-path"      class="tg-val mono">—</span>
+            <span class="tg-key">RTT</span>        <span id="tp-rtt"       class="tg-val mono">—</span>
+            <span class="tg-key">Your IP</span>    <span id="tp-route-loc" class="tg-val mono">—</span>
+            <span class="tg-key">Peer IP</span>    <span id="tp-route-rem" class="tg-val mono">—</span>
+            <span class="tg-key">Channels</span>   <span id="tp-channels"  class="tg-val"></span>
+            <span class="tg-key">WiFi sent</span>  <span id="tp-sent"      class="tg-val mono">0.00 MB</span>
+            <span class="tg-key">WiFi recv</span>  <span id="tp-recv"      class="tg-val mono">0.00 MB</span>
+        </div>
+    </details>
+
+    <!-- SENDER PANEL -->
+    <div id="sender-panel" class="hidden">
+        <div id="drop-zone" class="drop-zone">
+            <input type="file" id="file-input" multiple hidden>
+            <input type="file" id="folder-input" webkitdirectory hidden>
+            <div class="dz-inner">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:rgba(255,255,255,0.25)">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span class="dz-label">Tap to choose files</span>
+                <span class="dz-sub">or drag & drop · folders supported</span>
+            </div>
+        </div>
+        <div class="action-chips">
+            <button id="btn-clipboard" class="chip-btn">📋 Clipboard</button>
+            <button id="btn-zip" class="chip-btn hidden">📦 Send as ZIP</button>
+        </div>
+        <div id="send-queue" class="file-queue"></div>
+    </div>
+
+    <!-- RECEIVER PANEL -->
+    <div id="receiver-panel" class="hidden">
+        <div id="receiver-idle-card" class="idle-card">
+            <div style="font-size:40px;margin-bottom:12px">📥</div>
+            <p style="font-weight:600;font-size:15px;">Waiting for files</p>
+            <p style="font-size:12px;color:rgba(255,255,255,0.35);margin-top:6px;">Files appear here automatically</p>
+        </div>
+        <div id="receive-queue" class="file-queue"></div>
+    </div>
+
+</main>
+
+<!-- ████████ INCOMING MODAL ████████ -->
+<div id="incoming-modal" class="sheet-backdrop hidden">
+    <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div id="incoming-icon" class="sheet-file-icon">📄</div>
+        <div id="incoming-filename" class="sheet-filename">file.pdf</div>
+        <div id="incoming-filesize" class="sheet-filesize">—</div>
+        <div id="incoming-sender" class="sheet-sender">from Unknown</div>
+        <div class="sheet-meta">
+            <div class="sm-row"><span>Connection</span><span style="color:#4ADE80;font-weight:600;">Direct LAN</span></div>
+        </div>
+        <div class="sheet-btns">
+            <button id="btn-decline" class="sbtn-dec">Decline</button>
+            <button id="btn-accept"  class="sbtn-acc">Accept →</button>
+        </div>
+    </div>
+</div>
+
+<!-- ████████ PAIR REQUEST MODAL ████████ -->
+<div id="pair-request-modal" class="sheet-backdrop hidden">
+    <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-file-icon">📡</div>
+        <div class="sheet-filename">Incoming request</div>
+        <div class="sheet-sender"><strong id="pair-requester-name">Someone</strong> wants to send you files</div>
+        <div class="sheet-btns" style="margin-top:24px;">
+            <button id="btn-pair-decline" class="sbtn-dec">Decline</button>
+            <button id="btn-pair-accept"  class="sbtn-acc">Accept →</button>
+        </div>
+    </div>
+</div>
+
+</div><!-- #app -->
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+
+<script src="/js/config.js"></script>
+<script src="/js/detect.js"></script>
+<script src="/js/qr.js"></script>
+<script src="/js/preflight.js"></script>
+<script src="/js/feedback.js"></script>
+<script src="/js/wizard.js"></script>
+<script src="/js/lobby.js"></script>
+<script src="/js/transfer.js"></script>
+<script src="/js/webrtc.js"></script>
+<script src="/js/trust-panel.js"></script>
+<script src="/js/orbit.js"></script>
+<script src="/js/app.js"></script>
 </body>
 </html>

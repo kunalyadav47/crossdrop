@@ -1,65 +1,61 @@
+/**
+ * Preflight — network diagnostics
+ * Checks: online, wifi vs cellular, estimated bandwidth
+ */
 window.Preflight = {
     async run() {
-        return new Promise((resolve) => {
-            let status = 'Checking...';
-            let ips = [];
-            let networkType = 'Unknown';
-            let hotspotSuspected = false;
-            let message = 'Gathering network diagnostics...';
+        if (!navigator.onLine) {
+            return { status: '❌ No Internet — connect to WiFi hotspot', message: 'No network connection detected.' };
+        }
 
-            if (navigator.connection) {
-                networkType = navigator.connection.type || navigator.connection.effectiveType || 'Unknown';
+        // Connection type check (where supported)
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+            const type = conn.type || '';
+            const eff  = conn.effectiveType || '';
+            if (type === 'cellular' || eff === '2g' || eff === '3g') {
+                return {
+                    status: '⚠️ Cellular detected — switch to WiFi',
+                    message: 'CrossDrop works best over WiFi hotspot, not mobile data.',
+                    hotspotSuspected: false
+                };
             }
+        }
 
-            const pc = new RTCPeerConnection({ iceServers: [], iceCandidatePoolSize: 10 });
-            pc.createDataChannel('probe');
-
-            const timeout = setTimeout(() => finishProbe(), 2000);
-
-            pc.onicecandidate = (e) => {
-                if (e.candidate) {
-                    const c = e.candidate.candidate;
-                    if (c.includes('typ host')) {
-                        const ipMatch = c.split(' ')[4];
-                        if (ipMatch && !ips.includes(ipMatch)) {
-                            ips.push(ipMatch);
-                        }
-                    }
-                }
+        // Bandwidth test via backend
+        let mbps = 0;
+        try {
+            const start = performance.now();
+            const resp  = await fetch(BACKEND_URL + '/speedtest?t=' + Date.now(), { cache: 'no-store' });
+            await resp.blob();
+            const elapsed = (performance.now() - start) / 1000;
+            mbps = (2 / elapsed); // 2 MB payload
+        } catch (e) {
+            return {
+                status: '⚠️ Server unreachable — check URL in config.js',
+                message: 'Cannot reach the CrossDrop signaling server.'
             };
+        }
 
-            pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(() => finishProbe());
+        if (mbps < 5) {
+            return {
+                status: `⚠️ Slow: ${mbps.toFixed(1)} MB/s — try 5GHz hotspot`,
+                message: `Network is ${mbps.toFixed(1)} MB/s. Switch iPhone hotspot to 5GHz for best speed.`,
+                hotspotSuspected: true
+            };
+        }
 
-            function finishProbe() {
-                clearTimeout(timeout);
-                pc.close();
+        if (mbps < 15) {
+            return {
+                status: `⚡ OK: ${mbps.toFixed(1)} MB/s (2.4GHz?)`,
+                message: `Network is ${mbps.toFixed(1)} MB/s. 5GHz hotspot could double this.`,
+                hotspotSuspected: true
+            };
+        }
 
-                let hasLan = false;
-                ips.forEach(ip => {
-                    if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) || ip.startsWith('fe80:') || ip.endsWith('.local')) {
-                        hasLan = true;
-                    }
-                });
-
-                if (ips.length === 0) {
-                    status = 'No WiFi LAN found';
-                    message = 'Could not detect any local network interfaces. Check your WiFi.';
-                } else if (hasLan) {
-                    if (ips.length === 1 && (ips[0].startsWith('192.168.43.') || ips[0].startsWith('192.168.137.'))) {
-                        status = 'Hotspot detected — may need fix';
-                        message = 'We detected a common phone hotspot IP. AP Isolation might be active.';
-                        hotspotSuspected = true;
-                    } else {
-                        status = 'Ready for Pure LAN transfer';
-                        message = 'Full WiFi detected. Transfers should be blazing fast.';
-                    }
-                } else {
-                    status = 'No LAN detected';
-                    message = 'Only non-local IPs found. Connections might fail.';
-                }
-
-                resolve({ status, ips, networkType, hotspotSuspected, message });
-            }
-        });
+        return {
+            status: `✅ Ready — ${mbps.toFixed(0)} MB/s`,
+            message: `Network is fast at ${mbps.toFixed(0)} MB/s. You're good to go!`
+        };
     }
 };

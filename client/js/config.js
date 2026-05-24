@@ -1,2 +1,3 @@
 // Central config — loaded first before all other scripts
-const BACKEND_URL = 'https://crossdrop-yjib.onrender.com';
+// Use the page origin by default so local `npm start` works without edits.
+const BACKEND_URL = window.location.origin;

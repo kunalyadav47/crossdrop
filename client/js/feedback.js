@@ -1,79 +1,58 @@
+/**
+ * Feedback — Web Audio API sound effects (no files needed)
+ * Uses oscillators to generate tones — works fully offline.
+ */
 window.Feedback = {
-    audioCtx: null,
+    ctx: null,
     muted: localStorage.getItem('crossdrop_muted') === 'true',
-    
+
     init() {
-        if (!this.audioCtx) {
-            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        // Lazy AudioContext (must be created after user gesture)
+        document.addEventListener('click', () => {
+            if (!this.ctx) {
+                try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+                catch(e) { /* audio not supported */ }
+            }
+        }, { once: false });
     },
-    
+
     play(type) {
-        if (this.muted) return;
-        this.init();
-        if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
-        
-        const t = this.audioCtx.currentTime;
-        const osc = this.audioCtx.createOscillator();
-        const gain = this.audioCtx.createGain();
-        
-        osc.connect(gain);
-        gain.connect(this.audioCtx.destination);
-        
-        if (type === 'paired') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, t);
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.15, t + 0.005);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
-            osc.start(t);
-            osc.stop(t + 0.08);
-            if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
-        } 
-        else if (type === 'start') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(200, t);
-            osc.frequency.exponentialRampToValueAtTime(800, t + 0.2);
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.1, t + 0.1);
-            gain.gain.linearRampToValueAtTime(0, t + 0.2);
-            osc.start(t);
-            osc.stop(t + 0.2);
-        }
-        else if (type === 'complete') {
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0, t);
-            
-            osc.frequency.setValueAtTime(440, t);
-            gain.gain.linearRampToValueAtTime(0.1, t + 0.01);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-            
-            osc.frequency.setValueAtTime(554, t + 0.12);
-            gain.gain.linearRampToValueAtTime(0.1, t + 0.13);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.22);
-            
-            osc.frequency.setValueAtTime(659, t + 0.24);
-            gain.gain.linearRampToValueAtTime(0.15, t + 0.25);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-            
-            osc.start(t);
-            osc.stop(t + 0.4);
-            if (navigator.vibrate) navigator.vibrate([60]);
-        }
-        else if (type === 'error') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(100, t);
-            osc.frequency.exponentialRampToValueAtTime(60, t + 0.2);
-            gain.gain.setValueAtTime(0.15, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-            osc.start(t);
-            osc.stop(t + 0.2);
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
-        }
-    },
-    
-    toggleMute() {
-        this.muted = !this.muted;
-        localStorage.setItem('crossdrop_muted', this.muted);
+        if (this.muted || !this.ctx) return;
+        try {
+            const ac = this.ctx;
+            if (ac.state === 'suspended') ac.resume();
+
+            const play = (freq, startTime, duration, gain = 0.18, type = 'sine') => {
+                const osc = ac.createOscillator();
+                const env = ac.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, startTime);
+                env.gain.setValueAtTime(0, startTime);
+                env.gain.linearRampToValueAtTime(gain, startTime + 0.01);
+                env.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                osc.connect(env); env.connect(ac.destination);
+                osc.start(startTime); osc.stop(startTime + duration + 0.02);
+            };
+
+            const t = ac.currentTime;
+            switch (type) {
+                case 'paired':   // two rising tones
+                    play(440, t,       0.12);
+                    play(660, t + 0.1, 0.18);
+                    break;
+                case 'start':    // soft blip
+                    play(520, t, 0.10, 0.12);
+                    break;
+                case 'complete': // three ascending tones
+                    play(440, t,       0.10, 0.15);
+                    play(550, t + 0.1, 0.10, 0.15);
+                    play(660, t + 0.2, 0.18, 0.2);
+                    break;
+                case 'error':    // two descending tones
+                    play(330, t,       0.12, 0.15, 'square');
+                    play(220, t + 0.12,0.18, 0.15, 'square');
+                    break;
+            }
+        } catch(e) { /* ignore audio errors silently */ }
     }
 };

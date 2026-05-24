@@ -9,11 +9,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-
-  - type: web
-    name: crossdrop-frontend
-    env: static
-    rootDir: client
-    buildCommand: echo "no build needed"
-    staticPublishPath: .
-    plan: free
+# Note: frontend is served by the backend service to ensure config.js is
+# generated dynamically with the correct backend origin. Deploy only the
+# `crossdrop-backend` service which serves both API and static client files.

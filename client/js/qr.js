@@ -4,82 +4,73 @@ const QRScanner = {
 
     start(videoEl, onScan) {
         const container = videoEl.parentElement;
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            container.innerHTML = '<div style="color:#a0a0a0;padding:20px;text-align:center;">Camera not available.<br>Use the code below instead.</div>';
+        if (!navigator.mediaDevices?.getUserMedia) {
+            container.innerHTML = `<div class="cam-blocked">📷 Camera not available<br><small>Use the code below instead</small></div>`;
             return;
         }
-
         navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
         }).then(stream => {
             QRScanner.stream = stream;
             videoEl.srcObject = stream;
-            videoEl.setAttribute("playsinline", true);
-            videoEl.setAttribute("muted", true);
             videoEl.play();
-
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             QRScanner.interval = setInterval(() => {
-                if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
-                    canvas.width = videoEl.videoWidth;
-                    canvas.height = videoEl.videoHeight;
-                    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "dontInvert"
-                    });
-                    if (code && code.data && code.data.trim().length === 6) {
-                        onScan(code.data.trim().toUpperCase());
+                if (videoEl.readyState !== videoEl.HAVE_ENOUGH_DATA) return;
+                canvas.width  = videoEl.videoWidth;
+                canvas.height = videoEl.videoHeight;
+                ctx.drawImage(videoEl, 0, 0);
+                const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+                if (code?.data) {
+                    // Accept full URL with hash OR bare 6-char code
+                    let found = '';
+                    try {
+                        const url  = new URL(code.data);
+                        const hash = url.hash.replace('#','').trim().toUpperCase();
+                        if (hash.length === 6) found = hash;
+                    } catch {
+                        const bare = code.data.trim().toUpperCase();
+                        if (bare.length === 6) found = bare;
                     }
+                    if (found) { QRScanner.stop(); onScan(found); }
                 }
-            }, 300);
+            }, 250);
         }).catch(err => {
-            console.warn("Camera blocked:", err.name);
-            container.innerHTML = `<div style="color:#a0a0a0;padding:20px;text-align:center;">
-                📷 Camera blocked (${err.name}).<br>
-                <small>Allow camera permission and refresh,<br>or use the code below.</small>
-            </div>`;
+            console.warn('Camera blocked:', err.name);
+            container.innerHTML = `<div class="cam-blocked">📷 Camera blocked (${err.name})<br><small>Allow camera permission and refresh,<br>or type the code below</small></div>`;
         });
     },
 
     stop() {
-        if (this.stream) {
-            this.stream.getTracks().forEach(t => t.stop());
-            this.stream = null;
-        }
-        if (this.interval) {
-            clearInterval(this.interval);
-            this.interval = null;
-        }
+        this.stream?.getTracks().forEach(t => t.stop());
+        this.stream = null;
+        clearInterval(this.interval);
+        this.interval = null;
     }
 };
 
 function generateQR(text, containerId) {
     const container = document.getElementById(containerId);
-    if (!container) { console.error("QR container not found:", containerId); return; }
-
+    if (!container) return;
     container.innerHTML = '';
-
     if (typeof QRCode === 'undefined') {
-        container.innerHTML = '<div style="color:red;padding:10px;">QR library failed to load.<br>Use the code below.</div>';
+        container.innerHTML = `<div style="padding:12px;color:#888">QR failed to load — use code below</div>`;
         return;
     }
-
+    // Encode full URL with hash so scanning auto-joins
+    const shareUrl = window.location.origin + window.location.pathname + '#' + text;
     try {
-        const qr = new QRCode(container, {
-            text: text,
-            width: 220,
-            height: 220,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
+        new QRCode(container, {
+            text: shareUrl,
+            width: 200, height: 200,
+            colorDark: '#000000', colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M
         });
-        console.log("QR generated for:", text, qr);
     } catch (e) {
-        console.error("QR Generation failed:", e);
-        container.innerHTML = `<div style="color:red;padding:10px;">QR failed: ${e.message}<br>Use code: <strong>${text}</strong></div>`;
+        container.innerHTML = `<div style="padding:12px;color:red">QR Error: ${e.message}</div>`;
     }
 }
+
+window.QRScanner = QRScanner;

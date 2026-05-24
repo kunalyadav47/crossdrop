@@ -1,58 +1,43 @@
-const CACHE_NAME = 'crossdrop-v5-airdrop-clone';
-const ASSETS = [
-    '/',
-    '/index.html',
+const CACHE = 'crossdrop-v2';
+const PRECACHE = [
+    '/', '/index.html', '/manifest.json',
     '/css/app.css',
-    '/js/config.js',
-    '/js/app.js',
-    '/js/webrtc.js',
-    '/js/transfer.js',
-    '/js/qr.js',
-    '/js/detect.js',
-    '/js/preflight.js',
-    '/js/feedback.js',
-    '/js/wizard.js',
-    '/js/lobby.js',
-    '/js/trust-panel.js',
-    '/js/orbit.js',
-    '/icons/icon.svg',
-    '/manifest.json'
+    '/js/config.js', '/js/detect.js', '/js/qr.js',
+    '/js/preflight.js', '/js/feedback.js', '/js/wizard.js',
+    '/js/lobby.js', '/js/transfer.js', '/js/webrtc.js',
+    '/js/trust-panel.js', '/js/orbit.js', '/js/app.js',
+    '/icons/icon.svg', '/offline.html'
 ];
 
-self.addEventListener('install', (e) => {
-    self.skipWaiting();
+self.addEventListener('install', e => {
     e.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+        caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting())
     );
 });
 
-self.addEventListener('activate', (e) => {
-    e.waitUntil(clients.claim());
+self.addEventListener('activate', e => {
     e.waitUntil(
-        caches.keys().then(keys => {
-            return Promise.all(keys.map(key => {
-                if (key !== CACHE_NAME) {
-                    return caches.delete(key);
-                }
-            }));
-        })
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
     );
 });
 
-self.addEventListener('fetch', (e) => {
+self.addEventListener('fetch', e => {
+    // Never cache API/signaling calls
+    if (e.request.url.includes('/socket.io') || e.request.url.includes('/speedtest')) return;
     e.respondWith(
-        fetch(e.request)
-            .then(response => {
-                if (response && response.status === 200) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(e.request, clone);
-                    });
-                }
-                return response;
-            })
-            .catch(() => {
-                return caches.match(e.request);
-            })
+        caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
+            if (resp.ok && e.request.method === 'GET') {
+                const clone = resp.clone();
+                caches.open(CACHE).then(c => c.put(e.request, clone));
+            }
+            return resp;
+        }).catch(err => {
+            if (e.request.mode === 'navigate') {
+                return caches.match('/offline.html');
+            }
+            throw err;
+        }))
     );
 });

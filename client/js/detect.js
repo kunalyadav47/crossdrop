@@ -1,6 +1,9 @@
+// ─── Device Name Generator ───────────────────────────────────────────────────
 const DEVICE_NAMES = {
-    adjectives: ["Swift", "Blue", "Neon", "Cosmic", "Hyper", "Turbo", "Quantum", "Sonic", "Lunar", "Solar", "Cyber", "Mega"],
-    nouns: ["Mango", "Falcon", "Panther", "Fox", "Vortex", "Comet", "Pulse", "Wave", "Spark", "Nova", "Photon", "Glitch"]
+    adjectives: ["Swift", "Blue", "Neon", "Cosmic", "Hyper", "Turbo", "Quantum",
+                 "Sonic", "Lunar", "Solar", "Cyber", "Mega", "Pulse", "Storm"],
+    nouns: ["Mango", "Falcon", "Panther", "Fox", "Vortex", "Comet", "Pulse",
+            "Wave", "Spark", "Nova", "Photon", "Glitch", "Ember", "Drift"]
 };
 
 function detectDeviceType() {
@@ -32,9 +35,16 @@ async function measureBandwidth() {
         const end = performance.now();
         const duration = (end - start) / 1000;
         const sizeMB = blob.size / (1024 * 1024);
-        const speed = sizeMB / duration;
-        return speed;
+        return sizeMB / duration;
     } catch (e) {
-        return 20; // Assume good on error so we don't bother user needlessly
+        return 20; // assume good on error
     }
 }
+
+// ─── DeviceDetect namespace (fixes "DeviceDetect is not defined") ─────────────
+window.DeviceDetect = {
+    generateName() { return generateDeviceName(); },
+    getType() { return detectDeviceType(); },
+    // Measure bandwidth in MB/s by fetching the server speedtest endpoint
+    measureBandwidth: measureBandwidth
+};

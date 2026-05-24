@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CrossDrop - Offline</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090909;
+            color: #F0EDE6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            background: #111111;
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 16px;
+            padding: 40px 20px;
+        }
+        h1 { font-family: 'Inter Tight', sans-serif; font-size: 24px; color: #C8FF5F; margin-bottom: 16px; }
+        p { font-size: 15px; color: rgba(240,237,230,0.5); line-height: 1.5; margin-bottom: 24px; }
+        button {
+            background: #C8FF5F;
+            color: #0A0A0A;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>You are Offline</h1>
+        <p>CrossDrop works on WiFi — connect to a hotspot and reload.</p>
+        <button onclick="window.location.reload()">Retry</button>
+    </div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// BACKEND_URL is defined in config.js
+// BACKEND_URL is defined in config.js (loaded first)
 const socket = io(BACKEND_URL, {
   transports: ['websocket'],
   upgrade: false
@@ -9,14 +9,13 @@ const WebRTC = {
     dataChannels: [],
     roomId: null,
     isSender: false,
-    NUM_CHANNELS: 12,
+    NUM_CHANNELS: 16,          // ← bumped from 12 for max throughput
     connected: false,
     _peerName: '',
 
-    networkMode: 'strict', // 'strict', 'wifi', 'any'
+    networkMode: 'strict',
     sctpMaxMessageSize: 256 * 1024,
     safetyAbortTimer: null,
-    telemetryInterval: null,
     connectionType: 'unknown',
 
     isPrivateIp(ip) {
@@ -36,21 +35,22 @@ const WebRTC = {
         const ip = parts[4] || '';
         const typeIndex = parts.indexOf('typ');
         const type = typeIndex !== -1 ? parts[typeIndex + 1] : 'unknown';
-        
         const costMatch = candStr.match(/network-cost (\d+)/);
         const cost = costMatch ? parseInt(costMatch[1], 10) : null;
-        
         const idMatch = candStr.match(/network-id (\d+)/);
         const id = idMatch ? parseInt(idMatch[1], 10) : null;
-
         return { ip, type, cost, id };
     },
 
     startReceiver() {
         this.isSender = false;
         this.roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-        document.getElementById('room-code').textContent = this.roomId;
+        const codeEl = document.getElementById('room-code');
+        if (codeEl) codeEl.textContent = this.roomId;
         generateQR(this.roomId, 'qr-container');
+
+        // Put room code in URL hash so sender can share link
+        window.location.hash = this.roomId;
 
         this.setupPeer();
         socket.emit('join-room', this.roomId, window.myName);
@@ -61,19 +61,20 @@ const WebRTC = {
         this.roomId = code.trim().toUpperCase();
 
         const waiting = document.getElementById('send-waiting');
-        waiting.classList.remove('hidden');
-
-        if (!socket.connected) {
-            waiting.textContent = "❌ Not connected to server. Reload the page.";
-            return;
+        if (waiting) {
+            waiting.classList.remove('hidden');
+            if (!socket.connected) {
+                waiting.textContent = "❌ Not connected to server. Reload the page.";
+                return;
+            }
+            waiting.textContent = "Joining room…";
         }
 
-        waiting.textContent = "Joining room...";
         this.setupPeer();
         socket.emit('join-room', this.roomId, window.myName);
 
         setTimeout(() => {
-            waiting.textContent = "Creating connection offer...";
+            if (waiting) waiting.textContent = "Creating connection offer…";
             this.makeOffer();
         }, 1500);
     },
@@ -84,95 +85,110 @@ const WebRTC = {
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' }
             ],
-            iceCandidatePoolSize: 8
+            iceCandidatePoolSize: 10
         });
 
-        // Fail fast timer
         if (this.networkMode === 'strict') {
             clearTimeout(this.safetyAbortTimer);
             this.safetyAbortTimer = setTimeout(() => {
                 if (!this.connected) {
-                    const wait = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
-                    if (wait) wait.textContent = "❌ No LAN path found. Ensure both devices are on the SAME WiFi (not a hotspot with AP isolation), or loosen Network Rules in Advanced settings.";
+                    const wait = this.isSender
+                        ? document.getElementById('send-waiting')
+                        : document.getElementById('receive-waiting');
+                    if (wait) wait.textContent = "❌ No LAN path found. Ensure both devices are on the SAME WiFi, or loosen Network Rules in ⚙ Advanced.";
+                    if (window.Feedback) window.Feedback.play('error');
                     if (this.peer) { this.peer.close(); this.peer = null; }
                 }
             }, 15000);
         }
 
         this.peer.onicecandidate = (e) => {
-            if (e.candidate) {
-                const candStr = e.candidate.candidate || '';
-                const candInfo = this.parseCandidate(candStr);
+            if (!e.candidate) return;
+            const candStr = e.candidate.candidate || '';
+            const candInfo = this.parseCandidate(candStr);
 
-                if (this.networkMode === 'strict') {
-                    if (candInfo.type !== 'host' || !this.isPrivateIp(candInfo.ip)) {
-                        console.log('[LAN-Only] dropped non-private candidate:', candStr);
-                        return;
-                    }
-                    if (candInfo.cost !== null && candInfo.cost >= 900) {
-                        console.log('[LAN-Only] dropped cellular candidate (cost > 900):', candStr);
-                        return;
-                    }
-                } else if (this.networkMode === 'wifi') {
-                    if (candInfo.type === 'relay') return; // NEVER use turn
-                    if (candInfo.cost !== null && candInfo.cost >= 900) {
-                        console.log('[WiFi-Only] dropped cellular candidate (cost > 900):', candStr);
-                        return;
-                    }
-                }
-
-                socket.emit('ice-candidate', this.roomId, e.candidate);
+            if (this.networkMode === 'strict') {
+                if (candInfo.type !== 'host' || !this.isPrivateIp(candInfo.ip)) return;
+                if (candInfo.cost !== null && candInfo.cost >= 900) return;
+            } else if (this.networkMode === 'wifi') {
+                if (candInfo.type === 'relay') return;
+                if (candInfo.cost !== null && candInfo.cost >= 900) return;
             }
+
+            socket.emit('ice-candidate', this.roomId, e.candidate);
         };
 
         this.peer.oniceconnectionstatechange = () => {
-            const state = this.peer.iceConnectionState;
-            const el = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
+            const state = this.peer ? this.peer.iceConnectionState : 'closed';
+            const el = this.isSender
+                ? document.getElementById('send-waiting')
+                : document.getElementById('receive-waiting');
             if (el) {
                 el.classList.remove('hidden');
-                if (state === 'checking') el.textContent = "Checking network path...";
+                if (state === 'checking') el.textContent = "Checking network path…";
                 if (state === 'connected' || state === 'completed') {
-                    el.textContent = "✅ ICE Connected! Verifying route...";
+                    el.textContent = "✅ ICE Connected! Verifying route…";
                     this.verifyAndFinalize();
                 }
                 if (state === 'failed') {
-                    el.textContent = (this.networkMode === 'strict')
-                        ? "❌ Strict mode: no LAN route found. Try switching to 'WiFi Network OK' if using a router."
+                    el.textContent = this.networkMode === 'strict'
+                        ? "❌ Strict LAN: no direct route. Try 'WiFi Router' mode in ⚙ Advanced."
                         : "❌ Connection failed. Ensure devices can reach each other.";
+                    if (window.Feedback) window.Feedback.play('error');
                 }
                 if (state === 'disconnected') el.textContent = "⚠️ Peer disconnected.";
             }
         };
 
         if (this.isSender) {
+            const sorted = [];
             for (let i = 0; i < this.NUM_CHANNELS; i++) {
-                const dc = this.peer.createDataChannel(`ch-${i}`, { ordered: false, maxRetransmits: 50 });
-                this.setupDataChannel(dc);
-                this.dataChannels.push(dc);
+                const dc = this.peer.createDataChannel(`ch-${i}`, { ordered: false, maxRetransmits: 0 });
+                this.setupDataChannel(dc, i);
+                sorted.push(dc);
             }
+            this.dataChannels = sorted;
         } else {
             this.peer.ondatachannel = (e) => {
-                this.setupDataChannel(e.channel);
-                this.dataChannels.push(e.channel);
+                const idx = parseInt(e.channel.label.split('-')[1], 10) || this.dataChannels.length;
+                this.setupDataChannel(e.channel, idx);
+                this.dataChannels[idx] = e.channel;
+                const opened = this.dataChannels.filter(Boolean).length;
                 const el = document.getElementById('receive-waiting');
-                if (el) el.textContent = `Channel ${this.dataChannels.length}/${this.NUM_CHANNELS} open...`;
+                if (el) el.textContent = `Channels ${opened}/${this.NUM_CHANNELS} open…`;
             };
         }
     },
 
-    setupDataChannel(dc) {
+    setupDataChannel(dc, idx) {
         dc.binaryType = 'arraybuffer';
-        dc.bufferedAmountLowThreshold = 1024 * 1024; // 1MB
+        dc.bufferedAmountLowThreshold = 2 * 1024 * 1024;
+        dc.onopen  = () => this.verifyAndFinalize();
+        dc.onmessage = (e) => { if (window.FileTransfer) window.FileTransfer.onMessage(e.data); };
+        dc.onclose = () => { if (this.connected) this.disconnect(); };
+        dc.onbufferedamountlow = () => {
+            if (dc._onLowBuffer) {
+                const resolve = dc._onLowBuffer;
+                dc._onLowBuffer = null;
+                resolve();
+            }
+        };
+    },
 
-        dc.onopen = () => {
-            this.verifyAndFinalize();
-        };
-        dc.onmessage = (e) => {
-            if (window.FileTransfer) window.FileTransfer.onMessage(e.data);
-        };
-        dc.onclose = () => {
-            if (this.connected) this.disconnect();
-        };
+    async getRTT() {
+        if (!this.peer || !this.connected) return 50;
+        try {
+            const stats = await this.peer.getStats();
+            let rtt = 50;
+            stats.forEach(report => {
+                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                    if (report.currentRoundTripTime !== undefined) {
+                        rtt = report.currentRoundTripTime * 1000;
+                    }
+                }
+            });
+            return rtt;
+        } catch (e) { return 50; }
     },
 
     async verifyAndFinalize() {
@@ -180,7 +196,9 @@ const WebRTC = {
 
         const iceState = this.peer.iceConnectionState;
         const iceReady = iceState === 'connected' || iceState === 'completed';
-        const channelsReady = this.dataChannels.length === this.NUM_CHANNELS && this.dataChannels.every(c => c.readyState === 'open');
+        const validChannels = this.dataChannels.filter(Boolean);
+        const channelsReady = validChannels.length === this.NUM_CHANNELS
+                           && validChannels.every(c => c.readyState === 'open');
 
         if (!iceReady || !channelsReady) return;
 
@@ -188,71 +206,61 @@ const WebRTC = {
 
         try {
             const stats = await this.peer.getStats();
-            let localType = '', remoteType = '', localIp = '', remoteIp = '';
-            let networkType = 'unknown';
+            let localType = '', remoteType = '', localIp = '', remoteIp = '', networkType = 'unknown';
 
             stats.forEach(report => {
                 if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                    const localCand = stats.get(report.localCandidateId);
-                    const remoteCand = stats.get(report.remoteCandidateId);
-                    if (localCand && remoteCand) {
-                        localType = localCand.candidateType;
-                        remoteType = remoteCand.candidateType;
-                        localIp = localCand.ip || localCand.address;
-                        remoteIp = remoteCand.ip || remoteCand.address;
-                        networkType = localCand.networkType || 'unknown';
+                    const loc = stats.get(report.localCandidateId);
+                    const rem = stats.get(report.remoteCandidateId);
+                    if (loc && rem) {
+                        localType = loc.candidateType; remoteType = rem.candidateType;
+                        localIp = loc.ip || loc.address; remoteIp = rem.ip || rem.address;
+                        networkType = loc.networkType || 'unknown';
                     }
                 }
             });
 
-            const isPureLan = localType === 'host' && remoteType === 'host' && this.isPrivateIp(localIp) && this.isPrivateIp(remoteIp);
+            const isPureLan = localType === 'host' && remoteType === 'host'
+                           && this.isPrivateIp(localIp) && this.isPrivateIp(remoteIp);
 
             if (this.networkMode === 'strict' && !isPureLan) {
-                console.error("Strict mode violated. Connection rejected.");
-                const wait = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
-                if (wait) wait.textContent = "❌ Route verification failed. Internet path detected while in Strict mode.";
-                this.peer.close();
-                this.peer = null;
-                this.dataChannels = [];
+                const wait = this.isSender
+                    ? document.getElementById('send-waiting')
+                    : document.getElementById('receive-waiting');
+                if (wait) wait.textContent = "❌ Internet path detected in Strict LAN mode. Connection rejected.";
+                if (window.Feedback) window.Feedback.play('error');
+                this.peer.close(); this.peer = null; this.dataChannels = [];
                 return;
             }
 
             if (this.networkMode === 'wifi' && networkType === 'cellular') {
-                console.error("WiFi mode violated. Cellular path detected.");
-                const wait = this.isSender ? document.getElementById('send-waiting') : document.getElementById('receive-waiting');
-                if (wait) wait.textContent = "❌ Cellular path detected! Connection aborted to save data.";
-                this.peer.close();
-                this.peer = null;
-                this.dataChannels = [];
+                const wait = this.isSender
+                    ? document.getElementById('send-waiting')
+                    : document.getElementById('receive-waiting');
+                if (wait) wait.textContent = "❌ Cellular path detected. Aborted to save data.";
+                if (window.Feedback) window.Feedback.play('error');
+                this.peer.close(); this.peer = null; this.dataChannels = [];
                 return;
             }
 
-            if (isPureLan) this.connectionType = 'lan';
-            else if (localType === 'relay' || remoteType === 'relay') this.connectionType = 'relay';
-            else this.connectionType = 'internet';
+            this.connectionType = isPureLan ? 'lan'
+                                : (localType === 'relay' || remoteType === 'relay') ? 'relay'
+                                : 'internet';
 
             this.connected = true;
-            if(window.Feedback) window.Feedback.play('paired');
+            if (window.Feedback) window.Feedback.play('paired');
             this.onConnected(this._peerName);
-
-            if(window.TrustPanel) window.TrustPanel.start(this.peer);
+            if (window.TrustPanel) window.TrustPanel.start(this.peer);
 
         } catch (e) {
             console.error("Verification failed", e);
-            if (this.networkMode === 'strict') {
-                if (this.peer) this.peer.close();
-                return;
-            }
+            if (this.networkMode === 'strict' && this.peer) { this.peer.close(); return; }
             this.connectionType = 'unknown';
             this.connected = true;
-            if(window.Feedback) window.Feedback.play('paired');
+            if (window.Feedback) window.Feedback.play('paired');
             this.onConnected(this._peerName);
-            if(window.TrustPanel) window.TrustPanel.start(this.peer);
+            if (window.TrustPanel) window.TrustPanel.start(this.peer);
         }
-    },
-
-    startTelemetrySentinel() {
-        // Obsolete: TrustPanel now handles live telemetry.
     },
 
     async makeOffer() {
@@ -261,7 +269,7 @@ const WebRTC = {
             await this.peer.setLocalDescription(offer);
             socket.emit('offer', this.roomId, offer);
             const el = document.getElementById('send-waiting');
-            if (el) el.textContent = "Offer sent, waiting for answer...";
+            if (el) el.textContent = "Offer sent, waiting for answer…";
         } catch (e) {
             console.error("makeOffer failed", e);
             const el = document.getElementById('send-waiting');
@@ -271,8 +279,19 @@ const WebRTC = {
 
     onConnected(peerName) {
         if (window.FileTransfer) window.FileTransfer.init();
+        window.location.hash = ''; // clear hash after connect
 
-        document.getElementById('peer-name').textContent = peerName || 'Unknown Device';
+        // Update peer header
+        const peerNameEl = document.getElementById('peer-name');
+        if (peerNameEl) peerNameEl.textContent = peerName || 'Unknown Device';
+
+        // Update connection type badge
+        const badge = document.getElementById('conn-type-badge');
+        if (badge) {
+            const type = this.connectionType;
+            badge.textContent = type === 'lan' ? '🛡️ Pure LAN' : type === 'relay' ? '☁️ Relay' : '🌐 Internet';
+            badge.className = 'conn-badge ' + (type === 'lan' ? 'badge-lan' : 'badge-internet');
+        }
 
         if (this.isSender) {
             document.getElementById('sender-panel').classList.remove('hidden');
@@ -286,50 +305,51 @@ const WebRTC = {
     },
 
     disconnect() {
-        if(window.TrustPanel) window.TrustPanel.stop();
-        if(window.Orbit) window.Orbit.stop();
+        if (window.TrustPanel) window.TrustPanel.stop();
+        if (window.Orbit) window.Orbit.stop();
+        if (window.FileTransfer) window.FileTransfer.reset();
         if (this.peer) { this.peer.close(); this.peer = null; }
         this.dataChannels = [];
         this.connected = false;
         this.isSender = false;
         this.roomId = null;
         this.connectionType = 'unknown';
+        window.location.hash = '';
         socket.disconnect();
         socket.connect();
     }
 };
 
-// ---- Socket Connection Status Dot ----
+// ── Socket Status Dot ──────────────────────────────────────────────────────
 socket.on('connect', () => {
     const txt = document.getElementById('status-text');
-    const dot = document.querySelector('.dot');
+    const dot = document.querySelector('.status-dot');
     if (txt) txt.textContent = 'Ready';
     if (dot) { dot.classList.add('online'); dot.classList.remove('offline'); }
 });
 
 socket.on('disconnect', () => {
     const txt = document.getElementById('status-text');
-    const dot = document.querySelector('.dot');
+    const dot = document.querySelector('.status-dot');
     if (txt) txt.textContent = 'Offline';
     if (dot) { dot.classList.add('offline'); dot.classList.remove('online'); }
 });
 
-// ---- Signaling Handlers ----
-
+// ── Signaling Handlers ─────────────────────────────────────────────────────
 WebRTC._peerName = '';
 
 socket.on('user-joined', (id, deviceName) => {
     WebRTC._peerName = deviceName;
     if (!WebRTC.isSender) {
         const wait = document.getElementById('receive-waiting');
-        if (wait) { wait.classList.remove('hidden'); wait.textContent = 'Peer found! Waiting for offer...'; }
+        if (wait) { wait.classList.remove('hidden'); wait.textContent = '📶 Sender found! Waiting for offer…'; }
     }
 });
 
 socket.on('offer', async (id, offer) => {
     if (!WebRTC.isSender) {
         const wait = document.getElementById('receive-waiting');
-        if (wait) wait.textContent = "Offer received, connecting...";
+        if (wait) wait.textContent = "Offer received, connecting…";
         try {
             await WebRTC.peer.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await WebRTC.peer.createAnswer();
@@ -345,7 +365,7 @@ socket.on('offer', async (id, offer) => {
 socket.on('answer', async (id, answer) => {
     if (WebRTC.isSender) {
         const wait = document.getElementById('send-waiting');
-        if (wait) wait.textContent = 'Answer received, finalising ICE...';
+        if (wait) wait.textContent = 'Answer received, finalising ICE…';
         try {
             await WebRTC.peer.setRemoteDescription(new RTCSessionDescription(answer));
         } catch (e) {
@@ -356,30 +376,28 @@ socket.on('answer', async (id, answer) => {
 });
 
 socket.on('ice-candidate', async (id, candidate) => {
-    if (WebRTC.peer) {
-        try {
-            const candStr = candidate.candidate || '';
-            const candInfo = WebRTC.parseCandidate(candStr);
-
-            if (WebRTC.networkMode === 'strict') {
-                if (candInfo.type !== 'host' || !WebRTC.isPrivateIp(candInfo.ip)) {
-                    console.log('[LAN-only] dropping incoming non-private candidate');
-                    return;
-                }
-                if (candInfo.cost !== null && candInfo.cost >= 900) return;
-            } else if (WebRTC.networkMode === 'wifi') {
-                if (candInfo.type === 'relay') return;
-                if (candInfo.cost !== null && candInfo.cost >= 900) return;
-            }
-            await WebRTC.peer.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-            console.warn('ICE candidate add failed', e.message);
+    if (!WebRTC.peer) return;
+    try {
+        const candStr = candidate.candidate || '';
+        const candInfo = WebRTC.parseCandidate(candStr);
+        if (WebRTC.networkMode === 'strict') {
+            if (candInfo.type !== 'host' || !WebRTC.isPrivateIp(candInfo.ip)) return;
+            if (candInfo.cost !== null && candInfo.cost >= 900) return;
+        } else if (WebRTC.networkMode === 'wifi') {
+            if (candInfo.type === 'relay') return;
+            if (candInfo.cost !== null && candInfo.cost >= 900) return;
         }
+        await WebRTC.peer.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+        console.warn('ICE candidate add failed', e.message);
     }
 });
 
 socket.on('user-disconnected', () => {
+    if (!WebRTC.connected) return;
     WebRTC.disconnect();
-    alert("Peer disconnected.");
-    document.querySelectorAll('.back-btn')[0].click();
+    if (window.Feedback) window.Feedback.play('error');
+    showView('home');
+    // Show a non-blocking toast instead of alert
+    if (window.showToast) showToast('📴 Peer disconnected');
 });
